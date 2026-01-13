@@ -94,9 +94,7 @@ class LocalBackend(EmbeddingBackend):
             try:
                 from sentence_transformers import SentenceTransformer
 
-                self._model = SentenceTransformer(
-                    self._model_name, device=self._device
-                )
+                self._model = SentenceTransformer(self._model_name, device=self._device)
                 logger.info(
                     f"Loaded model '{self._model_name}' on device "
                     f"'{self._model.device}'"

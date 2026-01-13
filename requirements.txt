@@ -9,6 +9,10 @@ pydantic
 faiss-gpu
 numpy
 
+# Embedding Backends
+voyageai>=0.2.0
+sentence-transformers>=2.2
+
 # Data Fetching & Datasets
 datasets
 Pillow

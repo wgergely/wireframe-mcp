@@ -6,8 +6,8 @@ Provides pluggable embedding backends for vector generation:
 """
 
 from .base import EmbeddingBackend
-from .voyage import VoyageBackend
 from .local import LocalBackend
+from .voyage import VoyageBackend
 
 __all__ = [
     "EmbeddingBackend",

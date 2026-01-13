@@ -352,9 +352,7 @@ class LayoutSerializer:
         self._accumulate_components(node, counts)
         return counts
 
-    def _accumulate_components(
-        self, node: LayoutNode, counts: dict[str, int]
-    ) -> None:
+    def _accumulate_components(self, node: LayoutNode, counts: dict[str, int]) -> None:
         """Recursively accumulate component counts.
 
         Args:
