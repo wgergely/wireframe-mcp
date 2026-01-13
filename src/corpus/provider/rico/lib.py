@@ -59,52 +59,73 @@ class Provider(BaseProvider):
         return f"rico_{self.dataset_type}"
 
     @property
-    def _base_dir(self) -> Path:
-        """Directory for Rico content within the data directory."""
+    def _dest_dir(self) -> Path:
+        """Base directory for Rico data."""
         return self.data_dir / "rico"
 
     @property
     def _extract_dir(self) -> Path:
         """Directory where the dataset is extracted."""
-        return self._base_dir / self.dataset_type
+        return self._dest_dir / self.dataset_type
+
+    def _has_data(self) -> bool:
+        """Check if data exists.
+
+        Returns:
+            True if the extracted dataset directory exists, False otherwise.
+        """
+        return self._extract_dir.exists()
 
     def fetch(self, force: bool = False) -> None:
-        """Download and extract the Rico dataset."""
-        if self._extract_dir.exists() and not force:
-            logger.info(f"Dataset already exists at {self._extract_dir}")
+        """Download and extract the Rico dataset.
+
+        Args:
+            force: If True, force re-download even if data exists.
+        """
+        if self._has_data() and not force:
+            logger.info(f"[{self.name}] Dataset already exists at {self._extract_dir}")
             return
 
         url = self.dataset_info["url"]
-        self._base_dir.mkdir(parents=True, exist_ok=True)
+        self._dest_dir.mkdir(parents=True, exist_ok=True)
 
         filename = url.split("/")[-1]
-        output_path = self._base_dir / filename
+        output_path = self._dest_dir / filename
 
-        print(f"Downloading Rico {self.dataset_type} dataset from {url}...")
-        logger.info(f"Downloading Rico {self.dataset_type} dataset from {url}...")
+        logger.info(f"[{self.name}] Downloading from {url}...")
         self._download_with_progress(url, output_path)
 
-        logger.info(f"Extracting to {self._extract_dir}...")
+        logger.info(f"[{self.name}] Extracting to {self._extract_dir}...")
         self._extract_archive(output_path)
-        logger.info(f"Dataset ready at {self._extract_dir}")
+        logger.info(f"[{self.name}] Dataset ready at {self._extract_dir}")
 
     def _download_with_progress(self, url: str, output_path: Path) -> None:
-        """Download file with progress reporting."""
+        """Download file with progress reporting.
+
+        Args:
+            url: URL to download from.
+            output_path: Path to save the downloaded file.
+
+        Raises:
+            ConnectionError: If download fails.
+        """
 
         def progress_hook(block_num: int, block_size: int, total_size: int) -> None:
             if total_size > 0:
                 percent = min(100, (block_num * block_size / total_size) * 100)
-                # Keep progress as print with \r for visual feedback in CLI
-                print(f"  Progress: {percent:.1f}%", end="\r", flush=True)
+                logger.debug(f"[{self.name}] Progress: {percent:.1f}%")
 
         try:
             urlretrieve(url, output_path, reporthook=progress_hook)
-            print()
         except Exception as e:
-            raise ConnectionError(f"Failed to download {url}: {e}") from e
+            raise ConnectionError(f"[{self.name}] Failed to download: {e}") from e
 
     def _extract_archive(self, archive_path: Path) -> None:
-        """Extract archive to the extract directory."""
+        """Extract archive to the extract directory.
+
+        Args:
+            archive_path: Path to the archive file (.tar.gz or .zip).
+        """
         self._extract_dir.mkdir(parents=True, exist_ok=True)
 
         if archive_path.name.endswith(".tar.gz"):
@@ -115,10 +136,17 @@ class Provider(BaseProvider):
                 zf.extractall(path=self._extract_dir)
 
     def process(self) -> Iterator[StandardizedData]:
-        """Process Rico data and yield standardized items."""
-        if not self._extract_dir.exists():
+        """Process Rico data and yield standardized items.
+
+        Yields:
+            StandardizedData items from the Rico dataset.
+
+        Raises:
+            FileNotFoundError: If dataset directory does not exist.
+        """
+        if not self._has_data():
             raise FileNotFoundError(
-                f"Dataset not found at {self._extract_dir}. Run fetch() first."
+                f"[{self.name}] Dataset not found at {self._extract_dir}. Run fetch() first."
             )
 
         for json_path in self._extract_dir.rglob("*.json"):
@@ -127,7 +155,14 @@ class Provider(BaseProvider):
                 yield item
 
     def _process_json_file(self, json_path: Path) -> StandardizedData | None:
-        """Process a single JSON file and return StandardizedData."""
+        """Process a single JSON file and return StandardizedData.
+
+        Args:
+            json_path: Path to the JSON file.
+
+        Returns:
+            StandardizedData if successful, None if parsing fails.
+        """
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -148,8 +183,8 @@ class Provider(BaseProvider):
                 screenshot_path=screenshot_path if screenshot_path.exists() else None,
             )
         except json.JSONDecodeError:
-            logger.warning(f"Skipping invalid JSON: {json_path}")
+            logger.warning(f"[{self.name}] Skipping invalid JSON: {json_path}")
             return None
         except Exception as e:
-            logger.error(f"Error processing {json_path}: {e}")
+            logger.error(f"[{self.name}] Error processing {json_path}: {e}")
             return None

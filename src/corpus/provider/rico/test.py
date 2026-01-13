@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.corpus.provider.base.test import BaseProviderTest
 from src.corpus.provider.rico.lib import RICO_DATASETS
 from src.corpus.provider.rico.lib import Provider as RicoProvider
 
@@ -24,17 +25,23 @@ class TestRicoDatasets:
             assert "description" in info
 
 
-class TestRicoProvider:
+class TestRicoProvider(BaseProviderTest):
     """Tests for RicoProvider."""
 
+    @pytest.fixture
+    def provider_class(self):
+        """Return the RicoProvider class."""
+        # Create a wrapper that passes dataset_type
+        return lambda data_dir: RicoProvider(data_dir, dataset_type="semantic")
+
     @pytest.mark.unit
-    def test_init_sets_paths(self, tmp_path):
-        """Provider initializes paths correctly."""
+    def test_init_with_semantic_dataset(self, tmp_path):
+        """Provider initializes with semantic dataset type."""
         provider = RicoProvider(tmp_path, dataset_type="semantic")
         assert provider.name == "rico_semantic"
         assert provider.data_dir == tmp_path
         # Accessing private props for testing logic references
-        assert provider._base_dir == tmp_path / "rico"
+        assert provider._dest_dir == tmp_path / "rico"
         assert provider._extract_dir == tmp_path / "rico" / "semantic"
 
     @pytest.mark.unit

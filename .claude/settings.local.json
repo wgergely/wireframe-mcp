@@ -12,7 +12,13 @@
       "Bash(git push:*)",
       "Bash(dir:*)",
       "Bash(python:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" scripts/audit_rico.py)",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" scripts/audit_enrico.py)",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -m pytest src/corpus/normalizer/test.py -v)",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -c \"import bs4; print\\(''bs4:'', bs4.__version__\\)\")",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" scripts/audit_websight.py)",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -m pytest src/corpus/normalizer/test_html.py -v)"
     ]
   }
 }

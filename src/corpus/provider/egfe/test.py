@@ -60,7 +60,10 @@ class TestEgfeProvider(BaseProviderTest):
         assert isinstance(items[0], StandardizedData)
         assert items[0].id == "sample"
         assert items[0].source == "egfe"
-        assert items[0].hierarchy == test_data
+        # Hierarchy is transformed to Rico-compatible format
+        assert items[0].hierarchy["componentLabel"] == "Container"
+        assert items[0].hierarchy["class"] == "figma.Frame"
+        assert items[0].layout is not None
 
     @pytest.mark.unit
     def test_process_maps_screenshot(self, provider):

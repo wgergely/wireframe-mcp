@@ -1,30 +1,346 @@
 """ShowUI Desktop dataset provider."""
 
+import json
+from pathlib import Path
 from typing import Iterator
 
+from src.core import get_logger
 from src.corpus.provider.base import BaseProvider, StandardizedData
+from src.mid import ComponentType, LayoutNode
+
+logger = get_logger("provider.showui")
+
+# Default screen dimensions for converting normalized coords
+DEFAULT_SCREEN_WIDTH = 1920
+DEFAULT_SCREEN_HEIGHT = 1080
+
+# ShowUI Desktop dataset on HuggingFace
+SHOWUI_DATASET = "Voxel51/ShowUI_desktop"
+
+
+def _showui_hierarchy_to_layout(
+    hierarchy: dict,
+    id_prefix: str = "showui",
+    screen_width: int = DEFAULT_SCREEN_WIDTH,
+    screen_height: int = DEFAULT_SCREEN_HEIGHT,
+) -> LayoutNode:
+    """Convert ShowUI pseudo-hierarchy to LayoutNode.
+
+    ShowUI uses normalized coordinates [x, y, w, h] in 0-1 range.
+    We convert these to flex ratios for the LayoutNode structure.
+
+    Args:
+        hierarchy: ShowUI pseudo-hierarchy dict.
+        id_prefix: Prefix for node IDs.
+        screen_width: Screen width for flex calculation.
+        screen_height: Screen height for flex calculation.
+
+    Returns:
+        Root LayoutNode with children.
+    """
+    children = []
+
+    for i, child in enumerate(hierarchy.get("children", [])):
+        # Calculate flex ratio from normalized width (0-1 → 1-12)
+        bbox = child.get("bounds", [0, 0, 0.1, 0.1])
+        if len(bbox) >= 4:
+            width_ratio = bbox[2]  # Normalized width (0-1)
+            flex_ratio = max(1, min(12, round(width_ratio * 12)))
+        else:
+            flex_ratio = 1
+
+        # Infer component type from label
+        label_text = child.get("label", "action").lower()
+        if "button" in label_text or "click" in label_text:
+            comp_type = ComponentType.BUTTON
+        elif "text" in label_text or "input" in label_text:
+            comp_type = ComponentType.INPUT
+        elif "icon" in label_text:
+            comp_type = ComponentType.ICON
+        elif "image" in label_text:
+            comp_type = ComponentType.IMAGE
+        else:
+            comp_type = ComponentType.CONTAINER
+
+        child_node = LayoutNode(
+            id=f"{id_prefix}_{i}",
+            type=comp_type,
+            label=child.get("text") or None,
+            flex_ratio=flex_ratio,
+            children=[],
+        )
+        children.append(child_node)
+
+    # Create root node
+    return LayoutNode(
+        id=f"{id_prefix}_root",
+        type=ComponentType.CONTAINER,
+        label=hierarchy.get("text") or None,
+        flex_ratio=12,
+        children=children,
+    )
 
 
 class Provider(BaseProvider):
-    """Provider for the ShowUI Desktop dataset."""
+    """Provider for the ShowUI Desktop dataset.
+
+    ShowUI contains desktop GUI element detections with bounding boxes
+    and grounding instructions. Unlike Rico/Enrico, it has a flat structure
+    (no tree hierarchy) - elements are independent detections.
+    """
 
     @property
     def name(self) -> str:
         """Provider name."""
         return "showui"
 
-    def fetch(self, force: bool = False) -> None:
-        """Download ShowUI data.
+    @property
+    def _dest_dir(self) -> Path:
+        """Base directory for ShowUI data."""
+        return self.data_dir / "showui"
 
-        Placeholder for GitHub/Repo download.
+    @property
+    def _samples_dir(self) -> Path:
+        """Directory containing processed samples."""
+        return self._dest_dir / "samples"
+
+    def _has_data(self) -> bool:
+        """Check if data exists (JSON samples or HuggingFace cache)."""
+        if self._samples_dir.exists():
+            json_files = list(self._samples_dir.glob("*.json"))
+            return len(json_files) > 0
+        return False
+
+    def fetch(self, force: bool = False) -> None:
+        """Download ShowUI Desktop dataset.
+
+        This provider supports two modes:
+        1. If `datasets` library is available: Download from HuggingFace
+        2. Otherwise: Provide instructions for manual download
+
+        Args:
+            force: If True, force re-download even if data exists.
         """
-        dest_dir = self.data_dir / "showui"
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        self._dest_dir.mkdir(parents=True, exist_ok=True)
+
+        if self._has_data() and not force:
+            logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
+            return
+
+        # Try to use HuggingFace datasets library
+        try:
+            from datasets import load_dataset
+
+            logger.info(f"[{self.name}] Downloading from HuggingFace: {SHOWUI_DATASET}")
+            dataset = load_dataset(SHOWUI_DATASET, split="train")
+
+            # Save samples as JSON files for offline processing
+            self._samples_dir.mkdir(parents=True, exist_ok=True)
+
+            for i, sample in enumerate(dataset):
+                sample_path = self._samples_dir / f"sample_{i:05d}.json"
+                # Convert to serializable format
+                serializable = self._sample_to_dict(sample)
+                with open(sample_path, "w", encoding="utf-8") as f:
+                    json.dump(serializable, f)
+
+            logger.info(
+                f"[{self.name}] Saved {len(dataset)} samples to {self._samples_dir}"
+            )
+
+        except ImportError:
+            logger.warning(
+                f"[{self.name}] 'datasets' library not installed. "
+                "Install with: pip install datasets"
+            )
+            logger.info(f"[{self.name}] Creating sample data for testing...")
+            self._create_sample_data()
+
+    def _create_sample_data(self) -> None:
+        """Create sample data for testing without HuggingFace."""
+        self._samples_dir.mkdir(parents=True, exist_ok=True)
+
+        samples = [
+            {
+                "instruction": "Click the Settings button",
+                "detections": [
+                    {"label": "button", "bounding_box": [0.85, 0.02, 0.1, 0.05]},
+                ],
+                "query_type": "click",
+                "interfaces": "desktop",
+            },
+            {
+                "instruction": "Type in the search box",
+                "detections": [
+                    {"label": "input", "bounding_box": [0.3, 0.1, 0.4, 0.05]},
+                ],
+                "query_type": "type",
+                "interfaces": "desktop",
+            },
+            {
+                "instruction": "Select the file icon",
+                "detections": [
+                    {"label": "icon", "bounding_box": [0.05, 0.2, 0.08, 0.1]},
+                    {"label": "icon", "bounding_box": [0.15, 0.2, 0.08, 0.1]},
+                    {"label": "icon", "bounding_box": [0.25, 0.2, 0.08, 0.1]},
+                ],
+                "query_type": "click",
+                "interfaces": "desktop",
+            },
+        ]
+
+        for i, sample in enumerate(samples):
+            sample_path = self._samples_dir / f"sample_{i:05d}.json"
+            with open(sample_path, "w", encoding="utf-8") as f:
+                json.dump(sample, f)
+
+        logger.info(f"[{self.name}] Created {len(samples)} sample items")
+
+    def _sample_to_dict(self, sample: dict) -> dict:
+        """Convert HuggingFace sample to serializable dict.
+
+        Args:
+            sample: Raw sample from HuggingFace dataset.
+
+        Returns:
+            Serializable dictionary without PIL images.
+        """
+        result = {}
+
+        # Copy text fields
+        if "instruction" in sample:
+            result["instruction"] = sample["instruction"]
+
+        # Convert detections (bounding boxes)
+        if "action_detections" in sample:
+            detections = sample["action_detections"]
+            if hasattr(detections, "detections"):
+                result["detections"] = [
+                    {
+                        "label": d.get("label", "action"),
+                        "bounding_box": list(d.get("bounding_box", [])),
+                    }
+                    for d in detections.detections
+                ]
+            elif isinstance(detections, dict):
+                result["detections"] = detections.get("detections", [])
+
+        # Convert keypoints
+        if "action_keypoints" in sample:
+            keypoints = sample["action_keypoints"]
+            if hasattr(keypoints, "keypoints"):
+                result["keypoints"] = [
+                    {
+                        "label": k.get("label", "action"),
+                        "points": list(k.get("points", [])),
+                    }
+                    for k in keypoints.keypoints
+                ]
+            elif isinstance(keypoints, dict):
+                result["keypoints"] = keypoints.get("keypoints", [])
+
+        # Copy metadata
+        if "query_type" in sample:
+            qt = sample["query_type"]
+            result["query_type"] = qt.get("label") if isinstance(qt, dict) else str(qt)
+
+        if "interfaces" in sample:
+            iface = sample["interfaces"]
+            result["interfaces"] = (
+                iface.get("label") if isinstance(iface, dict) else str(iface)
+            )
+
+        return result
 
     def process(self) -> Iterator[StandardizedData]:
-        """Process ShowUI data."""
-        src_dir = self.data_dir / "showui"
-        if not src_dir.exists():
-            return
-        # Placeholder for processing logic
-        yield from []
+        """Process ShowUI data and yield standardized items.
+
+        Converts flat detections to pseudo-hierarchy with depth=1.
+
+        Yields:
+            StandardizedData items from the ShowUI dataset.
+        """
+        if not self._has_data():
+            raise FileNotFoundError(f"[{self.name}] Run fetch() first.")
+
+        for json_path in sorted(self._samples_dir.glob("*.json")):
+            item = self._process_json_file(json_path)
+            if item:
+                yield item
+
+    def _process_json_file(self, json_path: Path) -> StandardizedData | None:
+        """Process a single JSON sample and return StandardizedData.
+
+        Args:
+            json_path: Path to the JSON file.
+
+        Returns:
+            StandardizedData if successful, None if parsing fails.
+        """
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Convert flat detections to pseudo-hierarchy
+            hierarchy = self._detection_to_hierarchy(data)
+            item_id = json_path.stem
+
+            # Convert to LayoutNode
+            layout = _showui_hierarchy_to_layout(
+                hierarchy, id_prefix=f"showui_{item_id}"
+            )
+
+            return StandardizedData(
+                id=item_id,
+                source="showui",
+                dataset="desktop",
+                hierarchy=hierarchy,
+                layout=layout,
+                metadata={
+                    "filename": json_path.name,
+                    "query_type": data.get("query_type"),
+                    "interfaces": data.get("interfaces"),
+                },
+                screenshot_path=None,  # ShowUI samples don't include screenshot files
+            )
+        except json.JSONDecodeError:
+            logger.warning(f"[{self.name}] Skipping invalid JSON: {json_path}")
+            return None
+        except Exception as e:
+            logger.error(f"[{self.name}] Error reading {json_path}: {e}")
+            return None
+
+    def _detection_to_hierarchy(self, data: dict) -> dict:
+        """Convert flat detections to pseudo-hierarchy.
+
+        Creates a root "screen" container with flat children for each detection.
+
+        Args:
+            data: Sample data with detections and instruction.
+
+        Returns:
+            Pseudo-hierarchical structure with depth=1.
+        """
+        instruction = data.get("instruction", "")
+        detections = data.get("detections", [])
+
+        children = []
+        for i, det in enumerate(detections):
+            bbox = det.get("bounding_box", [0, 0, 0, 0])
+            children.append(
+                {
+                    "type": "element",
+                    "id": f"element_{i}",
+                    "bounds": bbox,  # Normalized [x, y, w, h] format
+                    "text": instruction,
+                    "label": det.get("label", "action"),
+                }
+            )
+
+        return {
+            "type": "screen",
+            "id": "root",
+            "bounds": [0, 0, 1, 1],  # Normalized full screen
+            "text": instruction,
+            "children": children,
+        }

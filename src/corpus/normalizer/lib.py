@@ -4,8 +4,6 @@ Converts raw UI hierarchy data from various providers (Rico, Enrico, etc.)
 into standardized LayoutNode representations for the MID layer.
 """
 
-from typing import Iterator
-from uuid import uuid4
 
 from src.mid import ComponentType, LayoutNode, Orientation
 
@@ -155,7 +153,11 @@ def _infer_orientation(children: list[dict]) -> Orientation:
         horizontal_spread += abs(cx2 - cx1)
         vertical_spread += abs(cy2 - cy1)
 
-    return Orientation.HORIZONTAL if horizontal_spread > vertical_spread else Orientation.VERTICAL
+    return (
+        Orientation.HORIZONTAL
+        if horizontal_spread > vertical_spread
+        else Orientation.VERTICAL
+    )
 
 
 def _generate_node_id(prefix: str, index: int) -> str:

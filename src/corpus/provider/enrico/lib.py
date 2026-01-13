@@ -42,15 +42,26 @@ class Provider(BaseProvider):
         """Directory containing screenshot JPG files."""
         return self._dest_dir / "screenshots"
 
+    def _has_data(self) -> bool:
+        """Check if data exists.
+
+        Returns:
+            True if both hierarchies and screenshots directories exist, False otherwise.
+        """
+        return self._hierarchies_dir.exists() and self._screenshots_dir.exists()
+
     def fetch(self, force: bool = False) -> None:
-        """Download and extract Enrico dataset (hierarchies + screenshots)."""
+        """Download and extract Enrico dataset (hierarchies + screenshots).
+
+        Args:
+            force: If True, force re-download even if data exists.
+        """
         self._dest_dir.mkdir(parents=True, exist_ok=True)
 
         # Check if already downloaded
-        if self._hierarchies_dir.exists() and self._screenshots_dir.exists():
-            if not force:
-                logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
-                return
+        if self._has_data() and not force:
+            logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
+            return
 
         # Download and extract hierarchies
         self._download_and_extract(
@@ -69,7 +80,16 @@ class Provider(BaseProvider):
         logger.info(f"[{self.name}] Ready at {self._dest_dir}")
 
     def _download_and_extract(self, name: str, url: str, extract_dir: Path) -> None:
-        """Download and extract a single archive."""
+        """Download and extract a single archive.
+
+        Args:
+            name: Name of the dataset (e.g., 'hierarchies', 'screenshots').
+            url: URL to download from.
+            extract_dir: Directory to extract archive contents into.
+
+        Raises:
+            ConnectionError: If download fails.
+        """
         zip_path = self._dest_dir / f"{name}.zip"
 
         logger.info(f"[{self.name}] Downloading {name} from {url}...")
@@ -84,8 +104,15 @@ class Provider(BaseProvider):
             zf.extractall(extract_dir)
 
     def process(self) -> Iterator[StandardizedData]:
-        """Process Enrico data and yield standardized items."""
-        if not self._hierarchies_dir.exists():
+        """Process Enrico data and yield standardized items.
+
+        Yields:
+            StandardizedData items from the Enrico dataset.
+
+        Raises:
+            FileNotFoundError: If dataset directory does not exist.
+        """
+        if not self._has_data():
             raise FileNotFoundError(f"[{self.name}] Run fetch() first.")
 
         # Build screenshot lookup once for efficiency
@@ -99,21 +126,37 @@ class Provider(BaseProvider):
     def _process_json_file(
         self, json_path: Path, screenshot_lookup: dict[str, Path]
     ) -> StandardizedData | None:
-        """Process a single JSON file and return StandardizedData."""
+        """Process a single JSON file and return StandardizedData.
+
+        Args:
+            json_path: Path to the JSON file.
+            screenshot_lookup: Dict mapping file stems to screenshot paths.
+
+        Returns:
+            StandardizedData if successful, None if parsing fails.
+        """
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             screenshot_path = screenshot_lookup.get(json_path.stem)
+            item_id = json_path.stem
+
+            # Normalize hierarchy to LayoutNode
+            layout = normalize_enrico_hierarchy(data, item_id)
 
             return StandardizedData(
-                id=json_path.stem,
+                id=item_id,
                 source="enrico",
                 dataset="default",
                 hierarchy=data,
+                layout=layout,
                 metadata={"filename": json_path.name},
                 screenshot_path=screenshot_path,
             )
+        except json.JSONDecodeError:
+            logger.warning(f"[{self.name}] Skipping invalid JSON: {json_path}")
+            return None
         except Exception as e:
             logger.error(f"[{self.name}] Error reading {json_path}: {e}")
             return None
