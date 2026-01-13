@@ -1,7 +1,7 @@
 """Tests for Docker module."""
 
-from src.docker import CONFIG_PATH, CORPUS_DATA_PATH, DOCKER_IMAGE_NAME, DOCKER_REGISTRY
-from src.docker.lib import get_container_path
+from docker import CONFIG_PATH, CORPUS_DATA_PATH, DOCKER_IMAGE_NAME, DOCKER_REGISTRY
+from docker.lib import get_container_path
 
 
 class TestDockerConstants:

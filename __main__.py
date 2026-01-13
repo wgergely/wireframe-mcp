@@ -9,7 +9,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from src.core import get_logger, setup_logging
 from src.corpus.api import CorpusManager
+
+logger = get_logger("cli")
 
 
 def cmd_download(args: argparse.Namespace) -> int:
@@ -17,26 +20,26 @@ def cmd_download(args: argparse.Namespace) -> int:
     try:
         manager = CorpusManager(data_dir=args.data_dir)
         manager.fetch_dataset(args.provider, force=args.force)
-        print(f"\nSuccess! Dataset '{args.provider}' is ready.")
+        logger.info(f"Success! Dataset '{args.provider}' is ready.")
         return 0
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         return 1
 
 
 def cmd_datasets(_args: argparse.Namespace) -> int:
     """Handle the datasets command."""
     manager = CorpusManager()
-    print("Available Providers:\n")
+    logger.info("Available Providers:")
     for name in manager.list_providers():
-        print(f"  {name}")
+        logger.info(f"  {name}")
     return 0
 
 
 def cmd_show_data_dir(args: argparse.Namespace) -> int:
     """Handle the data-dir command."""
     manager = CorpusManager(data_dir=args.data_dir)
-    print(f"Data directory: {manager.data_dir}")
+    logger.info(f"Data directory: {manager.data_dir}")
     return 0
 
 
@@ -110,7 +113,7 @@ def handle_corpus_command(argv: list[str]) -> int:
 def cmd_test(extra_args: list[str]) -> int:
     """Run pytest with provided arguments."""
     cmd = [sys.executable, "-m", "pytest", *extra_args]
-    print(f"Running: {' '.join(cmd)}")
+    logger.info(f"Running: {' '.join(cmd)}")
     try:
         return subprocess.call(cmd)
     except KeyboardInterrupt:
@@ -119,15 +122,15 @@ def cmd_test(extra_args: list[str]) -> int:
 
 def cmd_build(extra_args: list[str]) -> int:
     """Run docker compose commands."""
-    compose_file = Path("src/docker/docker-compose.yml")
+    compose_file = Path("docker/docker-compose.yml")
     if not compose_file.exists():
-        print(f"Error: {compose_file} not found.")
+        logger.error(f"Error: {compose_file} not found.")
         return 1
 
     action = extra_args if extra_args else ["build"]
     final_cmd = ["docker", "compose", "-f", str(compose_file), *action]
 
-    print(f"Running: {' '.join(final_cmd)}")
+    logger.info(f"Running: {' '.join(final_cmd)}")
     try:
         return subprocess.call(final_cmd)
     except KeyboardInterrupt:
@@ -167,9 +170,10 @@ def main() -> int:
     }
 
     if command in commands:
+        setup_logging()
         return commands[command]()
 
-    print(f"Unknown command: {command}")
+    logger.error(f"Unknown command: {command}")
     show_help()
     return 1
 

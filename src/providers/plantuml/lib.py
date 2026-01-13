@@ -97,7 +97,11 @@ class PlantUMLProvider(LayoutProvider):
         """Determine the Salt brace style for a node."""
         if node.orientation == Orientation.HORIZONTAL:
             return "{#"  # Grid layout
-        if node.type in (ComponentType.NAVBAR, ComponentType.DRAWER, ComponentType.TAB_BAR):
+        if node.type in (
+            ComponentType.NAVBAR,
+            ComponentType.DRAWER,
+            ComponentType.TAB_BAR,
+        ):
             return "{+"  # Tabbed panel
         return "{"  # Default grouping
 

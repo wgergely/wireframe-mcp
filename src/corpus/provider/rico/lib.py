@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Iterator, Literal
 from urllib.request import urlretrieve
 
+from src.core import get_logger
 from src.corpus.provider.base import BaseProvider, StandardizedData
+
+logger = get_logger("provider.rico")
 
 RICO_DATASETS = {
     "semantic": {
@@ -67,7 +70,7 @@ class Provider(BaseProvider):
     def fetch(self, force: bool = False) -> None:
         """Download and extract the Rico dataset."""
         if self._extract_dir.exists() and not force:
-            print(f"Dataset already exists at {self._extract_dir}")
+            logger.info(f"Dataset already exists at {self._extract_dir}")
             return
 
         url = self.dataset_info["url"]
@@ -77,11 +80,12 @@ class Provider(BaseProvider):
         output_path = self._base_dir / filename
 
         print(f"Downloading Rico {self.dataset_type} dataset from {url}...")
+        logger.info(f"Downloading Rico {self.dataset_type} dataset from {url}...")
         self._download_with_progress(url, output_path)
 
-        print(f"Extracting to {self._extract_dir}...")
+        logger.info(f"Extracting to {self._extract_dir}...")
         self._extract_archive(output_path)
-        print(f"Dataset ready at {self._extract_dir}")
+        logger.info(f"Dataset ready at {self._extract_dir}")
 
     def _download_with_progress(self, url: str, output_path: Path) -> None:
         """Download file with progress reporting."""
@@ -89,6 +93,7 @@ class Provider(BaseProvider):
         def progress_hook(block_num: int, block_size: int, total_size: int) -> None:
             if total_size > 0:
                 percent = min(100, (block_num * block_size / total_size) * 100)
+                # Keep progress as print with \r for visual feedback in CLI
                 print(f"  Progress: {percent:.1f}%", end="\r", flush=True)
 
         try:
@@ -136,8 +141,8 @@ class Provider(BaseProvider):
                 screenshot_path=screenshot_path if screenshot_path.exists() else None,
             )
         except json.JSONDecodeError:
-            print(f"Skipping invalid JSON: {json_path}")
+            logger.warning(f"Skipping invalid JSON: {json_path}")
             return None
         except Exception as e:
-            print(f"Error processing {json_path}: {e}")
+            logger.error(f"Error processing {json_path}: {e}")
             return None

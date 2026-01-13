@@ -2,7 +2,10 @@
 
 from typing import Iterator
 
+from src.core import get_logger
 from src.corpus.provider.base import BaseProvider, StandardizedData
+
+logger = get_logger("provider.websight")
 
 
 class Provider(BaseProvider):
@@ -28,11 +31,11 @@ class Provider(BaseProvider):
         dest_dir.mkdir(parents=True, exist_ok=True)
 
         if not any(dest_dir.iterdir()):
-            print(
+            logger.warning(
                 f"[{self.name}] Automatic download not yet implemented for WebSight "
                 "(2M+ items)."
             )
-            print(f"Please manually place parquet/jsonl files in: {dest_dir}")
+            logger.info(f"Please manually place parquet/jsonl files in: {dest_dir}")
 
     def process(self) -> Iterator[StandardizedData]:
         """Process local WebSight data files."""
