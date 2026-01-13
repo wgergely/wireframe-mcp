@@ -2,4 +2,5 @@
 @../.agent/rules/py-style.md
 @../.agent/rules/py-testing.md
 @../.agent/rules/git-commit.md
-@../.agent/workflows/create-new-feature-branch.md
+@../.agent/workflows/create-feature.md
+@../.agent/workflows/ruff-and-push.md

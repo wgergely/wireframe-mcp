@@ -20,7 +20,7 @@ $VenvPath = Join-Path $WorktreesContainer ".venv"
 # --- Environment Setup ---
 . (Join-Path $PSScriptRoot "_env-setup.ps1") -EnvFile $EnvFile -VenvPath $VenvPath
 
-$ProfilePath = Join-Path $ProjectRoot ".agent\profile"
+$ProfilePath = Join-Path $MainBranch ".agent\profile"
 $AntigravityExecutable = "antigravity"
 
 Write-Host "Launching Antigravity for $ProjectRoot..." -ForegroundColor Green
