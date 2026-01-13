@@ -117,20 +117,20 @@ Offers a sketchy, wireframe aesthetic with high tolerance for LLM output variati
 
 | Module              | Status | Description                                              |
 |---------------------|--------|----------------------------------------------------------|
-| `src/ir`            | Done     | Pydantic-based IR with 26 component types                |
-| `src/providers/d2`  | Done     | D2 DSL transpiler with direction/width hints             |
-| `src/providers/plantuml` | Done | PlantUML Salt transpiler with component rendering        |
-| `src/validation`    | Done     | Duplicate ID, flex ratio, and cycle detection            |
-| `src/corpus`        | Done     | Rico dataset download and integration                    |
+| `src/ir`            | ✅     | Pydantic-based IR with 26 component types                |
+| `src/providers/d2`  | ✅     | D2 DSL transpiler with direction/width hints             |
+| `src/providers/plantuml` | ✅ | PlantUML Salt transpiler with component rendering        |
+| `src/validation`    | ✅     | Duplicate ID, flex ratio, and cycle detection            |
+| `src/corpus`        | ✅     | Rico dataset download and integration                    |
 
 ### In Progress / Planned
 
 | Module              | Status | Description                                              |
 |---------------------|--------|----------------------------------------------------------|
-| MCP Server          | Planned     | FastMCP-based tool exposure                              |
-| Kroki Integration   | Planned     | HTTP rendering to PNG/SVG                                |
-| RAG System          | Planned     | FAISS-GPU vector search for layout retrieval             |
-| Agentic Mode        | Planned     | Server-side LLM orchestration                            |
+| MCP Server          | 🔲     | FastMCP-based tool exposure                              |
+| Kroki Integration   | 🔲     | HTTP rendering to PNG/SVG                                |
+| RAG System          | 🔲     | FAISS-GPU vector search for layout retrieval             |
+| Agentic Mode        | 🔲     | Server-side LLM orchestration                            |
 
 ## Future: RAG-Enhanced Layout Generation
 
@@ -163,9 +163,9 @@ This enables "style transfer" from existing premium designs and reduces hallucin
 ```
 
 ### Stage 2 (Validation)
-- [x] No duplicate IDs
-- [x] Flex ratios in valid range (3, 9)
-- [x] No cycles detected
+- ✅ No duplicate IDs
+- ✅ Flex ratios in valid range (3, 9)
+- ✅ No cycles detected
 
 ### Stage 3 Output (D2 DSL)
 ```d2

@@ -9,7 +9,8 @@
       "Bash(python -m pytest:*)",
       "Bash(ruff format:*)",
       "Bash(ruff check:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(dir:*)"
     ]
   }
 }

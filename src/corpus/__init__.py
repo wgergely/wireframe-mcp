@@ -1,9 +1,5 @@
-"""Corpus generation and management for UI layout data."""
+"""Corpus module."""
 
-from src.corpus.lib import CorpusDataset, download_rico, get_data_dir
+from src.corpus.api import CorpusManager
 
-__all__ = [
-    "CorpusDataset",
-    "download_rico",
-    "get_data_dir",
-]
+__all__ = ["CorpusManager"]
