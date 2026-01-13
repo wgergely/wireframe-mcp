@@ -139,3 +139,6 @@ cython_debug/
 .idea/
 *.swp
 *.swo
+
+# ruff
+.ruff_cache/

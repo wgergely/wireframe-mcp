@@ -24,7 +24,7 @@ $ProfilePath = Join-Path $MainBranch ".agent\profile"
 $AntigravityExecutable = "antigravity"
 
 Write-Host "Launching Antigravity for $ProjectRoot..." -ForegroundColor Green
-& $AntigravityExecutable --log $LogLevel --sync off --user-data-dir "$ProfilePath" "$ProjectRoot"
+& $AntigravityExecutable --log $LogLevel --sync off --remote-debugging-port=9000 --user-data-dir "$ProfilePath" "$ProjectRoot"
 
 # Give the process a moment to hand off
 Start-Sleep -Seconds 1
