@@ -2,18 +2,40 @@
 
 # ============================================================================
 # wireframe-mcp Docker Image
-# Multi-stage build for the MCP server with corpus data support
+# Multi-stage build for the MCP server with CUDA 12+ and Python 3.12 support
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-# Base stage: Python 3.12 slim
+# Base stage: CUDA 12.4.1 Runtime Ubuntu 22.04
 # ----------------------------------------------------------------------------
-FROM python:3.12-slim AS base
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS base
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+# Set environment variables for non-interactive installs and Python
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHON_VERSION=3.12
+
+# Install Python 3.12 and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-venv \
+    python${PYTHON_VERSION}-dev \
+    curl \
+    ca-certificates \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure `python` and `pip` point to Python 3.12
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYTHON_VERSION} \
+    && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python \
+    && ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python3
 
 WORKDIR /app
 
@@ -22,15 +44,12 @@ WORKDIR /app
 # ----------------------------------------------------------------------------
 FROM base AS builder
 
-# Install build dependencies if needed
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy dependency files
 COPY pyproject.toml requirements.txt ./
 
-# Install Python dependencies
+# Install Python dependencies (including faiss-gpu)
+# Note: faiss-gpu wheels often ship with their own CUDA libs, but we have system CUDA here too.
+# We trust pip to resolve the compatible wheel.
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir -e .
 
@@ -39,12 +58,13 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # ----------------------------------------------------------------------------
 FROM base AS runtime
 
-# Create non-root user for security
+# Create non-root user for security (although accessing /dev/nvidia might require specific groups in some runtimes)
 RUN groupadd --gid 1000 mcp \
     && useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home mcp
 
 # Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+# We find where site-packages are located for python 3.12
+COPY --from=builder /usr/local/lib/python3.12/dist-packages /usr/local/lib/python3.12/dist-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
@@ -64,7 +84,9 @@ VOLUME ["/app/corpus", "/app/config"]
 # Environment variables for MCP configuration
 ENV MCP_HOST=0.0.0.0 \
     MCP_PORT=8080 \
-    CORPUS_PATH=/app/corpus
+    CORPUS_PATH=/app/corpus \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Expose MCP server port
 EXPOSE 8080
@@ -73,5 +95,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "from src import list_providers; list_providers()" || exit 1
 
-# Default entrypoint (placeholder - update when MCP server is implemented)
+# Default entrypoint
 ENTRYPOINT ["python", "-m", "src"]

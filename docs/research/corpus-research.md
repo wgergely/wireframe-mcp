@@ -88,6 +88,30 @@ From `component_legend.json`:
 
 ---
 
+---
+
+## Dataset Suitability Ranking (2024 Analysis)
+
+Ranked based on **Acquirability** (ease of download), **License** (freedom to use/train), and **Normalizability** (ease of converting to vector-ready JSON trees).
+
+| Rank | Dataset | Availability & License | Normalizability | Verdict |
+| :--- | :--- | :--- | :--- | :--- |
+| **1** | **Enrico** | **Excellent**. Direct ZIP download. **MIT License**. Hosted on GitHub/HuggingFace. | **High (5/5)**. Cleaned subset of Rico. JSON includes semantic annotations and design topics. Perfect for training/prototyping. | **🏆 Best Starter** |
+| **2** | **Rico (Semantic)** | **High**. Available via HuggingFace (Voxel51/RootsAutomation). **CC-BY-4.0**. | **High (5/5)**. Standard Android View Hierarchy JSON. Rich semantic labels (Button, Text, Image). | **✅ Standard Corpus** |
+| **3** | **WebUI** | **Medium**. GitHub scripts to download 400k pages. Copyright ambiguous (likely fair use/research). | **Medium (3/5)**. HTML DOM is noisier than Android JSON. Requires significant cleaning to extract "visual layout" tree. | **Example of Quantity** |
+| **4** | **ScreenSpot** | **High**. HuggingFace. **Apache 2.0**. | **Low (2/5)**. Focused on "Instructions + Bounding Box". Lacks deep hierarchical layout trees for generation. Good for *grounding* (finding elements) but not *generating* them. | **Evaluation Only** |
+| **5** | **Original Rico** | **Low**. Official site often restricted/deprecated. | **High (5/5)**. Same as Semantic but harder to get legally/technically. | **Use Derivatives** |
+
+### Data Acquisition Strategy
+
+1.  **Phase 1 (MVP)**: Download **Enrico** (1.4k screens).
+    *   *Why*: Small, MIT licensed, pre-cleaned. Immediate "World Hello" for the Vector DB.
+2.  **Phase 2 (Scale)**: Ingest **Rico Semantic** (~72k screens) from HuggingFace.
+    *   *Why*: The standard for training. CC-BY-4.0 is safe for most internal agent usage.
+3.  **Phase 3 (Web)**: Scrape/Download **WebUI** only if Android layouts prove insufficient for the User's needs.
+
+---
+
 ## Complexity Metrics
 
 | Metric | Description | Weight |

@@ -1,2 +1,5 @@
 ruff
 pytest
+faiss-gpu
+numpy
+pydantic
