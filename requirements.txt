@@ -1,12 +1,15 @@
 # Development & Linting
 ruff
 pytest
+pytest-dotenv
+python-dotenv
 
 # Core & Data Models
 pydantic
 
 # Vector Database & Math
-faiss-gpu
+# Use faiss-cpu for pip install; faiss-gpu available via conda on Linux
+faiss-cpu
 numpy
 
 # Embedding Backends

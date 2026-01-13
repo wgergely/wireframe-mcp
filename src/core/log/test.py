@@ -1,6 +1,7 @@
 """Tests for core logging module."""
 
 import logging
+import pytest
 from io import StringIO
 
 from .lib import get_logger, setup_logging
@@ -9,17 +10,20 @@ from .lib import get_logger, setup_logging
 class TestLogging:
     """Test core logging API."""
 
+    @pytest.mark.unit
     def test_get_logger(self) -> None:
         """Verify logger instance creation."""
         logger = get_logger("test")
         assert logger.name == "test"
         assert isinstance(logger, logging.Logger)
 
+    @pytest.mark.unit
     def test_get_logger_default_name(self) -> None:
         """Verify default logger name."""
         logger = get_logger()
         assert logger.name == "wireframe-mcp"
 
+    @pytest.mark.unit
     def test_setup_logging(self) -> None:
         """Verify logging setup."""
         stream = StringIO()
