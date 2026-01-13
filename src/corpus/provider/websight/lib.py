@@ -101,29 +101,92 @@ class Provider(BaseProvider):
         """
         return hierarchy_to_layout(hierarchy, id_prefix=f"websight_{item_id}")
 
-    def fetch(self, force: bool = False) -> None:
-        """Download WebSight data.
+    def fetch(self, force: bool = False, sample_count: int = 1000) -> None:
+        """Download WebSight data from HuggingFace.
 
-        Due to the large size (317GB+), this method provides instructions
-        for manual download or streaming setup.
+        Uses streaming to fetch a subset of samples without downloading
+        the full 317GB dataset. Only stores HTML (no images) to keep
+        the dataset size manageable (~50-100MB for 1000 samples).
+
+        Args:
+            force: If True, re-fetch even if data exists.
+            sample_count: Number of samples to fetch (default: 1000).
+                         Set to 0 for full download instructions only.
         """
         self._dest_dir.mkdir(parents=True, exist_ok=True)
 
         # Check for existing data
-        parquet_files = list(self._dest_dir.glob("*.parquet"))
         jsonl_files = list(self._dest_dir.glob("*.jsonl"))
         json_files = list(self._dest_dir.glob("*.json"))
 
-        if (parquet_files or jsonl_files or json_files) and not force:
+        if (jsonl_files or json_files) and not force:
             logger.info(f"[{self.name}] Data found at {self._dest_dir}")
             return
 
-        # Create sample data for testing
-        sample_file = self._dest_dir / "sample.jsonl"
-        if not sample_file.exists():
-            logger.info(f"[{self.name}] Creating sample data for testing...")
-            self._create_sample_data(sample_file)
+        if sample_count == 0:
+            # Just show instructions for full dataset
+            self._show_manual_instructions()
+            return
 
+        # Try to fetch from HuggingFace using datasets library
+        try:
+            self._fetch_from_huggingface(sample_count)
+        except ImportError:
+            logger.warning(
+                f"[{self.name}] `datasets` library not installed. "
+                "Install with: pip install datasets"
+            )
+            self._create_sample_data(self._dest_dir / "sample.jsonl")
+            self._show_manual_instructions()
+        except Exception as e:
+            logger.error(f"[{self.name}] Failed to fetch from HuggingFace: {e}")
+            logger.info(f"[{self.name}] Falling back to sample data...")
+            self._create_sample_data(self._dest_dir / "sample.jsonl")
+
+    def _fetch_from_huggingface(self, sample_count: int) -> None:
+        """Fetch samples from HuggingFace using streaming.
+
+        Args:
+            sample_count: Number of samples to download.
+        """
+        from datasets import load_dataset
+
+        logger.info(
+            f"[{self.name}] Streaming {sample_count} samples from HuggingFace..."
+        )
+
+        # Use v0.2 which has better quality and Tailwind CSS
+        dataset = load_dataset(
+            "HuggingFaceM4/WebSight",
+            "v0.2",
+            split="train",
+            streaming=True,
+        )
+
+        output_file = self._dest_dir / "websight_samples.jsonl"
+        count = 0
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            for item in dataset:
+                if count >= sample_count:
+                    break
+
+                # Store only HTML text, not images (saves space)
+                sample = {
+                    "id": f"websight_{count:06d}",
+                    "text": item.get("text", ""),
+                    "llm_generated_idea": item.get("llm_generated_idea", ""),
+                }
+                f.write(json.dumps(sample) + "\n")
+                count += 1
+
+                if count % 100 == 0:
+                    logger.info(f"[{self.name}] Downloaded {count}/{sample_count}...")
+
+        logger.info(f"[{self.name}] Downloaded {count} samples to {output_file}")
+
+    def _show_manual_instructions(self) -> None:
+        """Show instructions for manual full dataset download."""
         logger.info(
             f"[{self.name}] WebSight is a large dataset (317GB+). "
             "For full dataset access:"
