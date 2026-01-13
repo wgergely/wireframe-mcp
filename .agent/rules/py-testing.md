@@ -1,3 +1,10 @@
-# Testing
-Use pytest only. Never import unittest. Use pytest.ini to define a minimal set of markers that include unit and integration. pytest plugins for async and MCP and FastAPI like testing environment. Make sure every test case is pytest native and has proper pytest markers. 
-Never import unittest or unittest mock/patch. 
+---
+trigger: always_on
+---
+
+- Use `pytest`
+- Do not import `unittest`. Do not use unittest fixtures, mocks, patches
+- Use pytest.ini to define markers (include unit and integration)
+- Use conftest.py to define 
+- Ensure pytest plugins are defined and utilised
+- Ensure every test case is pytest native and has supported pytest markers

@@ -1,5 +1,9 @@
-# Code style
-- Code style: use Google style documentation
-- Use type hinting
-- Use Python 3.12 compatibility for type hinting
-- Use ruff format and check for code cleanliness.
+---
+trigger: always_on
+---
+
+# Python Code Style
+
+- Use Google style documentation
+- Use type hinting (Python 3.12 compatibility)
+- Use `ruff format .` and `ruff check --fix`. Do address check issues
