@@ -159,67 +159,15 @@ def validate_layout(node: LayoutNode) -> list[ValidationError]:
     """Validate a LayoutNode tree for structural issues."""
     errors: list[ValidationError] = []
 
-    # Collect all IDs and check for duplicates
+    # Track IDs, visited nodes, and path for cycle detection
     id_counts: dict[str, int] = {}
-    _collect_ids(node, id_counts)
-
-    for node_id, count in id_counts.items():
-        if count > 1:
-            errors.append(
-                ValidationError(
-                    node_id=node_id,
-                    message=f"Duplicate ID '{node_id}' appears {count} times",
-                    error_type="duplicate_id",
-                )
-            )
-
-    # Validate flex ratios
-    errors.extend(_validate_flex_ratios(node))
-
-    # Check for cycles
-    errors.extend(_detect_cycles(node))
-
-    return errors
-
-
-def is_valid(node: LayoutNode) -> bool:
-    """Check if a layout tree is valid."""
-    return not validate_layout(node)
-
-
-def _collect_ids(node: LayoutNode, id_counts: dict[str, int]) -> None:
-    """Recursively collect all node IDs and count occurrences."""
-    id_counts[node.id] = id_counts.get(node.id, 0) + 1
-    for child in node.children:
-        _collect_ids(child, id_counts)
-
-
-def _validate_flex_ratios(node: LayoutNode) -> list[ValidationError]:
-    """Validate flex ratios are within bounds."""
-    errors: list[ValidationError] = []
-
-    def _check(n: LayoutNode) -> None:
-        if n.flex_ratio < 1 or n.flex_ratio > 12:
-            errors.append(
-                ValidationError(
-                    node_id=n.id,
-                    message=f"flex_ratio {n.flex_ratio} outside valid range 1-12",
-                    error_type="invalid_flex_ratio",
-                )
-            )
-        for child in n.children:
-            _check(child)
-
-    _check(node)
-    return errors
-
-
-def _detect_cycles(node: LayoutNode) -> list[ValidationError]:
-    """Detect cycles in the tree structure."""
-    errors: list[ValidationError] = []
     visited: set[int] = set()
 
-    def _check(n: LayoutNode, path: set[int]) -> None:
+    def visit(n: LayoutNode, path: set[int]) -> None:
+        # Check for duplicate IDs
+        id_counts[n.id] = id_counts.get(n.id, 0) + 1
+
+        # Check for cycles
         obj_id = id(n)
         if obj_id in path:
             errors.append(
@@ -230,16 +178,45 @@ def _detect_cycles(node: LayoutNode) -> list[ValidationError]:
                 )
             )
             return
+
+        # Check flex ratio
+        if n.flex_ratio < 1 or n.flex_ratio > 12:
+            errors.append(
+                ValidationError(
+                    node_id=n.id,
+                    message=f"flex_ratio {n.flex_ratio} outside valid range 1-12",
+                    error_type="invalid_flex_ratio",
+                )
+            )
+
         if obj_id in visited:
             return
+
         visited.add(obj_id)
         path.add(obj_id)
         for child in n.children:
-            _check(child, path)
+            visit(child, path)
         path.remove(obj_id)
 
-    _check(node, set())
+    visit(node, set())
+
+    # Report duplicate IDs
+    for node_id, count in id_counts.items():
+        if count > 1:
+            errors.append(
+                ValidationError(
+                    node_id=node_id,
+                    message=f"Duplicate ID '{node_id}' appears {count} times",
+                    error_type="duplicate_id",
+                )
+            )
+
     return errors
+
+
+def is_valid(node: LayoutNode) -> bool:
+    """Check if a layout tree is valid."""
+    return not validate_layout(node)
 
 
 def export_json_schema() -> dict:
@@ -258,4 +235,4 @@ __all__ = [
     "validate_layout",
     "is_valid",
     "export_json_schema",
-]
+]  # Removed: _collect_ids, _validate_flex_ratios, _detect_cycles (consolidated into validate_layout)

@@ -44,14 +44,7 @@ class PlantUMLProvider(LayoutProvider):
         return ".puml"
 
     def transpile(self, node: LayoutNode) -> str:
-        """Transpile a LayoutNode tree to PlantUML Salt.
-
-        Args:
-            node: The root LayoutNode to transpile.
-
-        Returns:
-            str: Complete PlantUML Salt code with @startsalt/@endsalt wrapper.
-        """
+        """Transpile a LayoutNode tree to PlantUML Salt."""
         body = self._transpile_node(node, indent=1)
         return f"@startsalt\n{body}\n@endsalt"
 
@@ -83,7 +76,7 @@ class PlantUMLProvider(LayoutProvider):
 
         # Add node label/title if present
         if node.label:
-            lines.append(f"{prefix}  {self._render_label(node.label)}")
+            lines.append(f'{prefix}  "{node.label}"')
 
         # Render children based on orientation
         if node.orientation == Orientation.HORIZONTAL:
@@ -101,69 +94,31 @@ class PlantUMLProvider(LayoutProvider):
         return "\n".join(lines)
 
     def _get_brace_style(self, node: LayoutNode) -> str:
-        """Determine the Salt brace style for a node.
-
-        Args:
-            node: The node to style.
-
-        Returns:
-            str: Opening brace sequence.
-        """
-        # Grid layout for horizontal containers
+        """Determine the Salt brace style for a node."""
         if node.orientation == Orientation.HORIZONTAL:
-            return "{#"
-
-        # Tabbed panel for navbar/drawer
-        if node.type in (
-            ComponentType.NAVBAR,
-            ComponentType.DRAWER,
-            ComponentType.TAB_BAR,
-        ):
-            return "{+"
-
-        # Default grouping
-        return "{"
+            return "{#"  # Grid layout
+        if node.type in (ComponentType.NAVBAR, ComponentType.DRAWER, ComponentType.TAB_BAR):
+            return "{+"  # Tabbed panel
+        return "{"  # Default grouping
 
     def _render_component(self, node: LayoutNode) -> str:
-        """Render a single component without children.
-
-        Args:
-            node: The node to render.
-
-        Returns:
-            str: Salt syntax for the component.
-        """
+        """Render a single component without children."""
         label = node.label or node.id
-        node_type = node.type
 
-        match node_type:
+        match node.type:
             case ComponentType.BUTTON | ComponentType.TEXT_BUTTON:
                 return f"[{label}]"
             case ComponentType.INPUT:
-                return f'"{label}    "'  # Underscores suggest input field
-            case ComponentType.CHECKBOX:
+                return f'"{label}    "'  # Spaces suggest input field
+            case ComponentType.CHECKBOX | ComponentType.SWITCH:
                 return f"[X] {label}"
             case ComponentType.RADIO_BUTTON:
                 return f"() {label}"
-            case ComponentType.SWITCH:
-                return f"[X] {label}"
             case ComponentType.TEXT | ComponentType.LIST_ITEM:
-                return self._render_label(label)
+                return f'"{label}"'
             case ComponentType.IMAGE:
                 return f"<&image> {label}"
             case ComponentType.ICON:
                 return f"<&star> {label}"
             case _:
-                # Default: quoted label
-                return self._render_label(label)
-
-    def _render_label(self, text: str) -> str:
-        """Render text as a Salt label.
-
-        Args:
-            text: The text to render.
-
-        Returns:
-            str: Salt label syntax.
-        """
-        return f'"{text}"'
+                return f'"{label}"'

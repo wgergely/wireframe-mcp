@@ -60,7 +60,7 @@ _registry: dict[str, type[LayoutProvider]] = {}
 def register_provider(provider_cls: type[LayoutProvider]) -> type[LayoutProvider]:
     """Register a provider class in the registry.
 
-    This is typically used as a decorator on provider classes.
+    Uses a temporary instance to retrieve the provider name.
 
     Args:
         provider_cls: The provider class to register.
@@ -74,9 +74,8 @@ def register_provider(provider_cls: type[LayoutProvider]) -> type[LayoutProvider
         ...     name = "my_dsl"
         ...     ...
     """
-    # Instantiate to get the name property
-    instance = provider_cls()
-    _registry[instance.name] = provider_cls
+    # Instantiate once to get the name property
+    _registry[provider_cls().name] = provider_cls
     return provider_cls
 
 

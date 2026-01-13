@@ -92,28 +92,11 @@ class D2Provider(LayoutProvider):
         return "\n".join(lines)
 
     def _escape_label(self, label: str) -> str:
-        """Escape special characters in D2 labels.
-
-        Args:
-            label: Raw label text.
-
-        Returns:
-            str: Escaped label safe for D2.
-        """
-        # D2 uses double quotes for labels with special chars
+        """Escape D2 special chars by quoting."""
         if any(c in label for c in "{}:;|"):
             return f'"{label}"'
         return label
 
     def _flex_to_percentage(self, flex_ratio: int) -> int:
-        """Convert flex ratio to approximate percentage.
-
-        Uses a 12-column grid as the base.
-
-        Args:
-            flex_ratio: Flex ratio value (1-12).
-
-        Returns:
-            int: Percentage width (rounded).
-        """
+        """Convert flex ratio (1-12) to percentage width."""
         return round((flex_ratio / 12) * 100)
