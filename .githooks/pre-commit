@@ -1,0 +1,12 @@
+#!/bin/bash
+# Pre-commit hook: Clean up Claude Code temporary working directory files
+# These files are created by Claude Code to track working directory state
+# and accumulate indefinitely due to a known bug
+
+# Remove tmpclaude-*-cwd files from staging area if they were accidentally added
+git rm --cached -q tmpclaude-*-cwd 2>/dev/null || true
+
+# Remove tmpclaude-*-cwd files from working directory
+rm -f tmpclaude-*-cwd 2>/dev/null || true
+
+exit 0
