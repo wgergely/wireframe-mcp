@@ -3,8 +3,8 @@
 import pytest
 
 from .lib import (
-    DEFAULT_MODEL,
-    MODEL_REGISTRY,
+    DEFAULT_LOCAL_MODEL,
+    EmbeddingModel,
     ModelManager,
     get_model_manager,
 )
@@ -91,8 +91,9 @@ def test_get_dimension_returns_known_dimensions():
     """get_dimension returns dimension from registry."""
     manager = ModelManager()
 
-    for model_name, info in MODEL_REGISTRY.items():
-        assert manager.get_dimension(model_name) == info["dimension"]
+    for model in EmbeddingModel.list_local():
+        spec = model.spec
+        assert manager.get_dimension(spec.name) == spec.dimension
 
 
 @pytest.mark.unit
@@ -129,18 +130,21 @@ def test_delete_returns_false_when_not_found(tmp_path):
 
 @pytest.mark.unit
 def test_default_model_is_in_registry():
-    """DEFAULT_MODEL is a valid model in the registry."""
-    assert DEFAULT_MODEL in MODEL_REGISTRY
+    """DEFAULT_LOCAL_MODEL is a valid model in the registry."""
+    manager = ModelManager()
+    spec = manager.get_spec(DEFAULT_LOCAL_MODEL.spec.name)
+    assert spec is not None
 
 
 @pytest.mark.unit
-def test_model_registry_has_required_fields():
-    """All models in registry have required fields."""
-    required_fields = {"dimension", "description", "size_mb"}
-
-    for model_name, info in MODEL_REGISTRY.items():
-        for field in required_fields:
-            assert field in info, f"{model_name} missing {field}"
+def test_model_spec_has_required_fields():
+    """All local models have required ModelSpec fields."""
+    for model in EmbeddingModel.list_local():
+        spec = model.spec
+        assert spec.name, f"{model} missing name"
+        assert spec.dimension > 0, f"{model} missing dimension"
+        assert spec.description, f"{model} missing description"
+        assert spec.size_mb is not None, f"{model} missing size_mb"
 
 
 @pytest.mark.unit
@@ -168,7 +172,7 @@ def test_download_creates_model_directory(tmp_path):
     # This test requires sentence-transformers and network access
     pytest.importorskip("sentence_transformers")
 
-    model_path = manager.download(DEFAULT_MODEL)
+    model_path = manager.download(DEFAULT_LOCAL_MODEL.spec.name)
 
     assert model_path.exists()
     assert (model_path / "config.json").exists()
@@ -182,7 +186,7 @@ def test_load_returns_model_instance(tmp_path):
     # This test requires sentence-transformers and network access
     st = pytest.importorskip("sentence_transformers")
 
-    model = manager.load(DEFAULT_MODEL, auto_download=True)
+    model = manager.load(DEFAULT_LOCAL_MODEL.spec.name, auto_download=True)
 
     assert isinstance(model, st.SentenceTransformer)
 
@@ -194,8 +198,8 @@ def test_load_caches_model_instance(tmp_path):
 
     pytest.importorskip("sentence_transformers")
 
-    model1 = manager.load(DEFAULT_MODEL, auto_download=True)
-    model2 = manager.load(DEFAULT_MODEL, auto_download=True)
+    model1 = manager.load(DEFAULT_LOCAL_MODEL.spec.name, auto_download=True)
+    model2 = manager.load(DEFAULT_LOCAL_MODEL.spec.name, auto_download=True)
 
     assert model1 is model2
 

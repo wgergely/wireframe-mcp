@@ -6,7 +6,6 @@ different providers (Voyage, Local sentence-transformers).
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal
 
 
 class ModelCapability(Enum):
@@ -41,6 +40,7 @@ class ModelSpec:
         capabilities: Set of supported capabilities.
         description: Human-readable description.
         requires_api_key: Whether this model needs an API key.
+        size_mb: Approximate model size in megabytes (for local models).
     """
 
     name: str
@@ -50,6 +50,7 @@ class ModelSpec:
     capabilities: frozenset[ModelCapability] = field(default_factory=frozenset)
     description: str = ""
     requires_api_key: bool = False
+    size_mb: int | None = None
 
     def supports(self, capability: ModelCapability) -> bool:
         """Check if model supports a capability."""
@@ -144,6 +145,7 @@ class EmbeddingModel(Enum):
         ),
         description="Fast general-purpose model, good balance",
         requires_api_key=False,
+        size_mb=80,
     )
 
     LOCAL_MPNET = ModelSpec(
@@ -161,6 +163,7 @@ class EmbeddingModel(Enum):
         ),
         description="Higher quality general-purpose model",
         requires_api_key=False,
+        size_mb=420,
     )
 
     LOCAL_QA = ModelSpec(
@@ -178,6 +181,43 @@ class EmbeddingModel(Enum):
         ),
         description="Optimized for semantic search/QA",
         requires_api_key=False,
+        size_mb=80,
+    )
+
+    LOCAL_PARAPHRASE = ModelSpec(
+        name="paraphrase-MiniLM-L6-v2",
+        dimension=384,
+        provider=ProviderType.LOCAL,
+        max_tokens=512,
+        capabilities=frozenset(
+            {
+                ModelCapability.BATCH_EMBED,
+                ModelCapability.QUERY_EMBED,
+                ModelCapability.GPU_ACCELERATED,
+                ModelCapability.OFFLINE,
+            }
+        ),
+        description="Optimized for paraphrase detection",
+        requires_api_key=False,
+        size_mb=80,
+    )
+
+    LOCAL_DISTILROBERTA = ModelSpec(
+        name="all-distilroberta-v1",
+        dimension=768,
+        provider=ProviderType.LOCAL,
+        max_tokens=512,
+        capabilities=frozenset(
+            {
+                ModelCapability.BATCH_EMBED,
+                ModelCapability.QUERY_EMBED,
+                ModelCapability.GPU_ACCELERATED,
+                ModelCapability.OFFLINE,
+            }
+        ),
+        description="DistilRoBERTa-based general embeddings",
+        requires_api_key=False,
+        size_mb=290,
     )
 
     @property

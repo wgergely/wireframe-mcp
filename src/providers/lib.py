@@ -6,7 +6,7 @@ provides a registry/factory for accessing them by name.
 
 from abc import ABC, abstractmethod
 
-from src.ir import LayoutNode
+from src.ir import LayoutNode, TranspilationContext
 
 
 class LayoutProvider(ABC):
@@ -19,6 +19,8 @@ class LayoutProvider(ABC):
         - name: Provider identifier string
         - file_extension: Output file extension
         - transpile: IR to DSL conversion
+
+    Optionally implement transpile_with_context for RAG-aware transpilation.
 
     Example:
         >>> class MyProvider(LayoutProvider):
@@ -51,6 +53,21 @@ class LayoutProvider(ABC):
             str: DSL code representing the layout.
         """
         ...
+
+    def transpile_with_context(self, context: TranspilationContext) -> str:
+        """Transpile with full context including RAG results.
+
+        Providers can override this to use similar_layouts, hints,
+        and metadata from the context. Default implementation
+        delegates to transpile().
+
+        Args:
+            context: Full transpilation context with RAG data.
+
+        Returns:
+            str: DSL code representing the layout.
+        """
+        return self.transpile(context.node)
 
 
 # Provider registry - populated by provider modules on import

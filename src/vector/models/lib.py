@@ -4,44 +4,25 @@ Provides unified storage and retrieval for local embedding models.
 Models are stored in {repo_root}/.corpus/models by default.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from src.config import get_models_dir
 
+from ..backend.model_spec import DEFAULT_LOCAL_MODEL, EmbeddingModel, ModelSpec
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
+
 logger = logging.getLogger(__name__)
 
-# Default model for general-purpose embeddings
-DEFAULT_MODEL = "all-MiniLM-L6-v2"
 
-# Model registry with metadata
-MODEL_REGISTRY: dict[str, dict] = {
-    "all-MiniLM-L6-v2": {
-        "dimension": 384,
-        "description": "Fast general-purpose model, good balance of speed/quality",
-        "size_mb": 80,
-    },
-    "all-mpnet-base-v2": {
-        "dimension": 768,
-        "description": "Higher quality general-purpose model",
-        "size_mb": 420,
-    },
-    "paraphrase-MiniLM-L6-v2": {
-        "dimension": 384,
-        "description": "Optimized for paraphrase detection",
-        "size_mb": 80,
-    },
-    "multi-qa-MiniLM-L6-cos-v1": {
-        "dimension": 384,
-        "description": "Optimized for semantic search/QA",
-        "size_mb": 80,
-    },
-    "all-distilroberta-v1": {
-        "dimension": 768,
-        "description": "DistilRoBERTa-based general embeddings",
-        "size_mb": 290,
-    },
-}
+def _get_local_model_registry() -> dict[str, ModelSpec]:
+    """Build registry of local models from EmbeddingModel enum."""
+    return {m.spec.name: m.spec for m in EmbeddingModel.list_local()}
 
 
 class ModelManager:
@@ -52,7 +33,7 @@ class ModelManager:
 
     Example:
         >>> manager = ModelManager()
-        >>> model = manager.get_model("all-MiniLM-L6-v2")
+        >>> model = manager.load("all-MiniLM-L6-v2")
         >>> embeddings = model.encode(["hello world"])
     """
 
@@ -64,7 +45,8 @@ class ModelManager:
                 if not provided.
         """
         self._models_dir = get_models_dir(models_dir)
-        self._loaded_models: dict = {}
+        self._loaded_models: dict[str, SentenceTransformer] = {}
+        self._registry = _get_local_model_registry()
 
     @property
     def models_dir(self) -> Path:
@@ -114,6 +96,17 @@ class ModelManager:
                 downloaded.append(path.name)
         return downloaded
 
+    def get_spec(self, model_name: str) -> ModelSpec | None:
+        """Get ModelSpec for a model.
+
+        Args:
+            model_name: Name of the model.
+
+        Returns:
+            ModelSpec if found, None otherwise.
+        """
+        return self._registry.get(model_name)
+
     def get_dimension(self, model_name: str) -> int | None:
         """Get embedding dimension for a model.
 
@@ -123,13 +116,24 @@ class ModelManager:
         Returns:
             Embedding dimension, or None if unknown.
         """
-        if model_name in MODEL_REGISTRY:
-            return MODEL_REGISTRY[model_name]["dimension"]
-        return None
+        spec = self.get_spec(model_name)
+        return spec.dimension if spec else None
+
+    def get_size_mb(self, model_name: str) -> int | None:
+        """Get approximate model size in MB.
+
+        Args:
+            model_name: Name of the model.
+
+        Returns:
+            Size in MB if known, None otherwise.
+        """
+        spec = self.get_spec(model_name)
+        return spec.size_mb if spec else None
 
     def download(
         self,
-        model_name: str = DEFAULT_MODEL,
+        model_name: str = DEFAULT_LOCAL_MODEL.spec.name,
         force: bool = False,
     ) -> Path:
         """Download a model to the centralized storage.
@@ -175,10 +179,10 @@ class ModelManager:
 
     def load(
         self,
-        model_name: str = DEFAULT_MODEL,
+        model_name: str = DEFAULT_LOCAL_MODEL.spec.name,
         device: str | None = None,
         auto_download: bool = True,
-    ):
+    ) -> SentenceTransformer:
         """Load a model for inference.
 
         Args:
@@ -272,6 +276,8 @@ def get_model_manager(models_dir: Path | str | None = None) -> ModelManager:
 __all__ = [
     "ModelManager",
     "get_model_manager",
-    "DEFAULT_MODEL",
-    "MODEL_REGISTRY",
+    # Re-export from model_spec for convenience
+    "DEFAULT_LOCAL_MODEL",
+    "EmbeddingModel",
+    "ModelSpec",
 ]

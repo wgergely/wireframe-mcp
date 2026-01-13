@@ -120,19 +120,21 @@ class LayoutSerializer:
         Returns:
             SerializedLayout with text and statistics.
         """
-        text = self.serialize(node)
-        node_count = self._count_nodes(node)
-        max_depth = self._max_depth(node)
-        component_summary = self._count_components(node)
+        # Single-pass serialization with statistics collection
+        if self.config.format == SerializationFormat.INDENTED:
+            lines, stats = self._serialize_indented_with_stats(node, depth=0)
+            text = "\n".join(lines)
+        else:
+            text, stats = self._serialize_linearized_with_stats(node)
 
         return SerializedLayout(
             id=item_id,
             source=source,
             dataset=dataset,
             text=text,
-            node_count=node_count,
-            max_depth=max_depth,
-            component_summary=component_summary,
+            node_count=stats["node_count"],
+            max_depth=stats["max_depth"],
+            component_summary=stats["components"],
         )
 
     def serialize_batch(
@@ -177,6 +179,22 @@ class LayoutSerializer:
 
         Returns:
             List of text lines for this node and children.
+        """
+        lines, _ = self._serialize_indented_with_stats(node, depth)
+        return lines
+
+    def _serialize_indented_with_stats(
+        self, node: LayoutNode, depth: int
+    ) -> tuple[list[str], dict]:
+        """Serialize node to indented format with single-pass statistics.
+
+        Args:
+            node: Current node to serialize.
+            depth: Current indentation depth.
+
+        Returns:
+            Tuple of (lines, stats_dict) where stats contains node_count,
+            max_depth, and components dict.
         """
         lines = []
         indent = " " * (depth * self.config.indent_size)
@@ -230,11 +248,30 @@ class LayoutSerializer:
 
         lines.append(indent + " ".join(parts))
 
-        # Recursively process children
-        for child in node.children:
-            lines.extend(self._serialize_indented(child, depth + 1))
+        # Initialize stats for this node
+        node_count = 1
+        max_depth = depth
+        components: dict[str, int] = {type_value: 1}
 
-        return lines
+        # Recursively process children and accumulate stats
+        for child in node.children:
+            child_lines, child_stats = self._serialize_indented_with_stats(
+                child, depth + 1
+            )
+            lines.extend(child_lines)
+
+            # Merge stats
+            node_count += child_stats["node_count"]
+            max_depth = max(max_depth, child_stats["max_depth"])
+            for comp_type, count in child_stats["components"].items():
+                components[comp_type] = components.get(comp_type, 0) + count
+
+        stats = {
+            "node_count": node_count,
+            "max_depth": max_depth,
+            "components": components,
+        }
+        return lines, stats
 
     def _serialize_linearized(self, node: LayoutNode) -> str:
         """Serialize node to linearized sequence format.
@@ -245,9 +282,23 @@ class LayoutSerializer:
         Returns:
             Compact string with XML-like tags.
         """
-        parts = []
-        self._linearize_node(node, parts)
-        return " ".join(parts)
+        text, _ = self._serialize_linearized_with_stats(node)
+        return text
+
+    def _serialize_linearized_with_stats(self, node: LayoutNode) -> tuple[str, dict]:
+        """Serialize node to linearized format with single-pass statistics.
+
+        Args:
+            node: Root node to serialize.
+
+        Returns:
+            Tuple of (text, stats_dict) where stats contains node_count,
+            max_depth, and components dict.
+        """
+        parts: list[str] = []
+        stats = {"node_count": 0, "max_depth": 0, "components": {}}
+        self._linearize_node_with_stats(node, parts, stats, depth=0)
+        return " ".join(parts), stats
 
     def _linearize_node(self, node: LayoutNode, parts: list[str]) -> None:
         """Recursively linearize a node into parts list.

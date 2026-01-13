@@ -4,14 +4,20 @@ Uses sentence-transformers for offline embedding generation.
 Provides fallback when Voyage API is unavailable.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..models import DEFAULT_MODEL, get_model_manager
+from ..models import get_model_manager
 from .base import EmbeddingBackend
+from .model_spec import DEFAULT_LOCAL_MODEL
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +37,7 @@ class LocalBackend(EmbeddingBackend):
 
     def __init__(
         self,
-        model_name: str = DEFAULT_MODEL,
+        model_name: str = DEFAULT_LOCAL_MODEL.spec.name,
         device: str | None = None,
         normalize: bool = True,
         models_dir: Path | str | None = None,
@@ -55,7 +61,7 @@ class LocalBackend(EmbeddingBackend):
         self._normalize = normalize
         self._auto_download = auto_download
         self._model_manager = get_model_manager(models_dir)
-        self._model: Any = None
+        self._model: SentenceTransformer | None = None
         self._dimension: int | None = None
 
     @property
@@ -79,7 +85,7 @@ class LocalBackend(EmbeddingBackend):
         """Get backend identifier."""
         return f"local:{self._model_name}"
 
-    def _get_model(self) -> Any:
+    def _get_model(self) -> SentenceTransformer:
         """Lazily initialize sentence-transformers model.
 
         Uses the centralized ModelManager for model storage and loading.
