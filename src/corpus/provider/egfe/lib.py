@@ -196,7 +196,6 @@ class Provider(BaseProvider):
             Component label string.
         """
         name = node.get("name", "").lower()
-        node_type = node.get("type", "FRAME")
 
         # Check name patterns for common UI elements
         for patterns, label in COMPONENT_NAME_PATTERNS.items():
@@ -204,13 +203,16 @@ class Provider(BaseProvider):
                 return label
 
         # Fall back to type mapping
+        node_type = node.get("type", "FRAME")
         comp_type = FIGMA_TYPE_MAP.get(node_type, ComponentType.CONTAINER)
-        return {
-            ComponentType.CONTAINER: "Container",
-            ComponentType.CARD: "Card",
-            ComponentType.TEXT: "Text",
-            ComponentType.ICON: "Icon",
-        }.get(comp_type, "Container")
+
+        if comp_type == ComponentType.CARD:
+            return "Card"
+        if comp_type == ComponentType.TEXT:
+            return "Text"
+        if comp_type == ComponentType.ICON:
+            return "Icon"
+        return "Container"
 
     def _sketch_to_hierarchy(self, data: dict) -> dict:
         """Convert Sketch export format to Rico-compatible hierarchy.
@@ -332,19 +334,14 @@ class Provider(BaseProvider):
         if not self._dest_dir.exists():
             return False
 
-        json_files = list(self._dest_dir.rglob("*.json"))
-        png_files = list(self._dest_dir.rglob("*.png"))
-        has_json = len(json_files) > 0
-        has_png = len(png_files) > 0
-
-        if data_type is None:
-            return has_json
-        elif data_type == DataType.HIERARCHY:
-            return has_json
-        elif data_type == DataType.IMAGE:
-            return has_png
-        elif data_type in (DataType.LAYOUT, DataType.TEXT):
-            return has_json
+        if data_type is None or data_type in (
+            DataType.HIERARCHY,
+            DataType.LAYOUT,
+            DataType.TEXT,
+        ):
+            return any(self._dest_dir.rglob("*.json"))
+        if data_type == DataType.IMAGE:
+            return any(self._dest_dir.rglob("*.png"))
         return False
 
     def to_layout(self, hierarchy: dict, item_id: str) -> LayoutNode:
@@ -397,32 +394,26 @@ class Provider(BaseProvider):
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-
-            # Convert Figma format to Rico-compatible hierarchy
-            hierarchy = self._figma_to_hierarchy(data)
-
-            # Convert to LayoutNode
-            item_id = json_path.stem
-            layout = hierarchy_to_layout(hierarchy, id_prefix=f"egfe_{item_id}")
-
-            screenshot_path = screenshot_lookup.get(json_path.stem)
-
-            return StandardizedData(
-                id=item_id,
-                source="egfe",
-                dataset="default",
-                hierarchy=hierarchy,
-                layout=layout,
-                metadata={
-                    "filename": json_path.name,
-                    "figma_type": data.get("type", ""),
-                    "figma_name": data.get("name", ""),
-                },
-                screenshot_path=screenshot_path,
-            )
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Skipping invalid JSON: {json_path}")
             return None
         except Exception as e:
             logger.error(f"[{self.name}] Error reading {json_path}: {e}")
             return None
+
+        item_id = json_path.stem
+        hierarchy = self._figma_to_hierarchy(data)
+
+        return StandardizedData(
+            id=item_id,
+            source="egfe",
+            dataset="default",
+            hierarchy=hierarchy,
+            layout=self.to_layout(hierarchy, item_id),
+            metadata={
+                "filename": json_path.name,
+                "figma_type": data.get("type", ""),
+                "figma_name": data.get("name", ""),
+            },
+            screenshot_path=screenshot_lookup.get(item_id),
+        )

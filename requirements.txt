@@ -3,3 +3,5 @@ pytest
 faiss-gpu
 numpy
 pydantic
+datasets
+Pillow

@@ -74,20 +74,14 @@ class Provider(BaseProvider):
         if not self._dest_dir.exists():
             return False
 
-        parquet_files = list(self._dest_dir.glob("*.parquet"))
-        jsonl_files = list(self._dest_dir.glob("*.jsonl"))
-        json_files = list(self._dest_dir.glob("*.json"))
-        has_data_files = bool(parquet_files or jsonl_files or json_files)
-
-        if data_type is None:
-            return has_data_files
-        elif data_type == DataType.HIERARCHY:
-            return has_data_files  # HTML is the hierarchy source
-        elif data_type == DataType.IMAGE:
+        if data_type == DataType.IMAGE:
             return False  # WebSight images are in-memory, not files
-        elif data_type in (DataType.LAYOUT, DataType.TEXT):
-            return has_data_files
-        return False
+
+        return (
+            any(self._dest_dir.glob("*.parquet"))
+            or any(self._dest_dir.glob("*.jsonl"))
+            or any(self._dest_dir.glob("*.json"))
+        )
 
     def to_layout(self, hierarchy: dict, item_id: str) -> "LayoutNode":
         """Convert HTML hierarchy to LayoutNode.
@@ -212,7 +206,7 @@ class Provider(BaseProvider):
             {
                 "id": "sample_001",
                 "text": SAMPLE_HTML,
-                "llm_generated_idea": "A simple landing page with header, main content, and footer",
+                "llm_generated_idea": "A simple landing page with header and footer",
             },
             {
                 "id": "sample_002",
@@ -384,24 +378,20 @@ class Provider(BaseProvider):
             return None
 
         try:
-            # Convert HTML to hierarchy
             hierarchy = normalize_html_to_hierarchy(html)
-
-            # Convert hierarchy to LayoutNode
-            layout = self.to_layout(hierarchy, item_id)
-
-            return StandardizedData(
-                id=item_id,
-                source="websight",
-                dataset="v0.2",
-                hierarchy=hierarchy,
-                layout=layout,
-                metadata={
-                    "llm_idea": data.get("llm_generated_idea", ""),
-                    "html_length": len(html),
-                },
-                screenshot_path=None,  # WebSight images are in-memory PIL
-            )
         except Exception as e:
             logger.error(f"[{self.name}] Error converting item {item_id}: {e}")
             return None
+
+        return StandardizedData(
+            id=item_id,
+            source="websight",
+            dataset="v0.2",
+            hierarchy=hierarchy,
+            layout=self.to_layout(hierarchy, item_id),
+            metadata={
+                "llm_idea": data.get("llm_generated_idea", ""),
+                "html_length": len(html),
+            },
+            screenshot_path=None,
+        )

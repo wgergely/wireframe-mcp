@@ -83,12 +83,11 @@ class Provider(BaseProvider):
 
         if data_type is None:
             return True
-        elif data_type == DataType.HIERARCHY:
-            return len(list(self._extract_dir.rglob("*.json"))) > 0
-        elif data_type == DataType.IMAGE:
-            return len(list(self._extract_dir.rglob("*.png"))) > 0
-        elif data_type in (DataType.LAYOUT, DataType.TEXT):
-            # These are derived from hierarchy
+        if data_type == DataType.HIERARCHY:
+            return any(self._extract_dir.rglob("*.json"))
+        if data_type == DataType.IMAGE:
+            return any(self._extract_dir.rglob("*.png"))
+        if data_type in (DataType.LAYOUT, DataType.TEXT):
             return self.has_data(DataType.HIERARCHY)
         return False
 
@@ -174,7 +173,8 @@ class Provider(BaseProvider):
         """
         if not self.has_data():
             raise FileNotFoundError(
-                f"[{self.name}] Dataset not found at {self._extract_dir}. Run fetch() first."
+                f"[{self.name}] Dataset not found at {self._extract_dir}. "
+                "Run fetch() first."
             )
 
         for json_path in self._extract_dir.rglob("*.json"):
@@ -194,25 +194,22 @@ class Provider(BaseProvider):
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-
-            screenshot_path = json_path.with_suffix(".png")
-            item_id = json_path.stem
-
-            # Normalize hierarchy to LayoutNode
-            layout = self.to_layout(data, item_id)
-
-            return StandardizedData(
-                id=item_id,
-                source="rico",
-                dataset=self.dataset_type,
-                hierarchy=data,
-                layout=layout,
-                metadata={"filename": json_path.name},
-                screenshot_path=screenshot_path if screenshot_path.exists() else None,
-            )
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Skipping invalid JSON: {json_path}")
             return None
         except Exception as e:
             logger.error(f"[{self.name}] Error processing {json_path}: {e}")
             return None
+
+        item_id = json_path.stem
+        screenshot_path = json_path.with_suffix(".png")
+
+        return StandardizedData(
+            id=item_id,
+            source="rico",
+            dataset=self.dataset_type,
+            hierarchy=data,
+            layout=self.to_layout(data, item_id),
+            metadata={"filename": json_path.name},
+            screenshot_path=screenshot_path if screenshot_path.exists() else None,
+        )

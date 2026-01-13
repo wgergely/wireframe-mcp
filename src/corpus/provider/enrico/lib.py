@@ -52,16 +52,17 @@ class Provider(BaseProvider):
         Returns:
             True if requested data is available, False otherwise.
         """
-        has_hier = self._hierarchies_dir.exists()
-        has_img = self._screenshots_dir.exists()
-
         if data_type is None:
-            return has_hier and has_img
-        elif data_type == DataType.HIERARCHY:
-            return has_hier and len(list(self._hierarchies_dir.rglob("*.json"))) > 0
-        elif data_type == DataType.IMAGE:
-            return has_img and len(list(self._screenshots_dir.rglob("*.jpg"))) > 0
-        elif data_type in (DataType.LAYOUT, DataType.TEXT):
+            return self._hierarchies_dir.exists() and self._screenshots_dir.exists()
+        if data_type == DataType.HIERARCHY:
+            return self._hierarchies_dir.exists() and any(
+                self._hierarchies_dir.rglob("*.json")
+            )
+        if data_type == DataType.IMAGE:
+            return self._screenshots_dir.exists() and any(
+                self._screenshots_dir.rglob("*.jpg")
+            )
+        if data_type in (DataType.LAYOUT, DataType.TEXT):
             return self.has_data(DataType.HIERARCHY)
         return False
 
@@ -165,25 +166,21 @@ class Provider(BaseProvider):
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-
-            screenshot_path = screenshot_lookup.get(json_path.stem)
-            item_id = json_path.stem
-
-            # Normalize hierarchy to LayoutNode
-            layout = self.to_layout(data, item_id)
-
-            return StandardizedData(
-                id=item_id,
-                source="enrico",
-                dataset="default",
-                hierarchy=data,
-                layout=layout,
-                metadata={"filename": json_path.name},
-                screenshot_path=screenshot_path,
-            )
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Skipping invalid JSON: {json_path}")
             return None
         except Exception as e:
             logger.error(f"[{self.name}] Error reading {json_path}: {e}")
             return None
+
+        item_id = json_path.stem
+
+        return StandardizedData(
+            id=item_id,
+            source="enrico",
+            dataset="default",
+            hierarchy=data,
+            layout=self.to_layout(data, item_id),
+            metadata={"filename": json_path.name},
+            screenshot_path=screenshot_lookup.get(item_id),
+        )

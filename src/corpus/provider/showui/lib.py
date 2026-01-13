@@ -53,17 +53,14 @@ class Provider(BaseProvider):
         if not self._samples_dir.exists():
             return False
 
-        json_files = list(self._samples_dir.glob("*.json"))
-        has_json = len(json_files) > 0
-
-        if data_type is None:
-            return has_json
-        elif data_type == DataType.HIERARCHY:
-            return has_json
-        elif data_type == DataType.IMAGE:
+        if data_type == DataType.IMAGE:
             return False  # ShowUI samples don't include screenshot files
-        elif data_type in (DataType.LAYOUT, DataType.TEXT):
-            return has_json
+        if data_type is None or data_type in (
+            DataType.HIERARCHY,
+            DataType.LAYOUT,
+            DataType.TEXT,
+        ):
+            return any(self._samples_dir.glob("*.json"))
         return False
 
     def to_layout(self, hierarchy: dict, item_id: str) -> LayoutNode:
@@ -241,8 +238,6 @@ class Provider(BaseProvider):
         self,
         hierarchy: dict,
         id_prefix: str = "showui",
-        screen_width: int = DEFAULT_SCREEN_WIDTH,
-        screen_height: int = DEFAULT_SCREEN_HEIGHT,
     ) -> LayoutNode:
         """Convert ShowUI pseudo-hierarchy to LayoutNode.
 
@@ -252,8 +247,6 @@ class Provider(BaseProvider):
         Args:
             hierarchy: ShowUI pseudo-hierarchy dict.
             id_prefix: Prefix for node IDs.
-            screen_width: Screen width for flex calculation.
-            screen_height: Screen height for flex calculation.
 
         Returns:
             Root LayoutNode with children.
@@ -261,37 +254,22 @@ class Provider(BaseProvider):
         children = []
 
         for i, child in enumerate(hierarchy.get("children", [])):
-            # Calculate flex ratio from normalized width (0-1 → 1-12)
             bbox = child.get("bounds", [0, 0, 0.1, 0.1])
-            if len(bbox) >= 4:
-                width_ratio = bbox[2]  # Normalized width (0-1)
-                flex_ratio = max(1, min(12, round(width_ratio * 12)))
-            else:
-                flex_ratio = 1
+            width_ratio = bbox[2] if len(bbox) >= 4 else 0.1
+            flex_ratio = max(1, min(12, round(width_ratio * 12)))
 
-            # Infer component type from label
-            label_text = child.get("label", "action").lower()
-            if "button" in label_text or "click" in label_text:
-                comp_type = ComponentType.BUTTON
-            elif "text" in label_text or "input" in label_text:
-                comp_type = ComponentType.INPUT
-            elif "icon" in label_text:
-                comp_type = ComponentType.ICON
-            elif "image" in label_text:
-                comp_type = ComponentType.IMAGE
-            else:
-                comp_type = ComponentType.CONTAINER
+            comp_type = self._infer_component_type(child.get("label", "action"))
 
-            child_node = LayoutNode(
-                id=f"{id_prefix}_{i}",
-                type=comp_type,
-                label=child.get("text") or None,
-                flex_ratio=flex_ratio,
-                children=[],
+            children.append(
+                LayoutNode(
+                    id=f"{id_prefix}_{i}",
+                    type=comp_type,
+                    label=child.get("text") or None,
+                    flex_ratio=flex_ratio,
+                    children=[],
+                )
             )
-            children.append(child_node)
 
-        # Create root node
         return LayoutNode(
             id=f"{id_prefix}_root",
             type=ComponentType.CONTAINER,
@@ -299,6 +277,26 @@ class Provider(BaseProvider):
             flex_ratio=12,
             children=children,
         )
+
+    def _infer_component_type(self, label: str) -> ComponentType:
+        """Infer ComponentType from ShowUI label.
+
+        Args:
+            label: The label text from ShowUI detection.
+
+        Returns:
+            Appropriate ComponentType for the label.
+        """
+        label_lower = label.lower()
+        if "button" in label_lower or "click" in label_lower:
+            return ComponentType.BUTTON
+        if "text" in label_lower or "input" in label_lower:
+            return ComponentType.INPUT
+        if "icon" in label_lower:
+            return ComponentType.ICON
+        if "image" in label_lower:
+            return ComponentType.IMAGE
+        return ComponentType.CONTAINER
 
     def _process_json_file(self, json_path: Path) -> StandardizedData | None:
         """Process a single JSON sample and return StandardizedData.
@@ -312,35 +310,29 @@ class Provider(BaseProvider):
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-
-            # Convert flat detections to pseudo-hierarchy
-            hierarchy = self._detection_to_hierarchy(data)
-            item_id = json_path.stem
-
-            # Convert to LayoutNode
-            layout = self._showui_hierarchy_to_layout(
-                hierarchy, id_prefix=f"showui_{item_id}"
-            )
-
-            return StandardizedData(
-                id=item_id,
-                source="showui",
-                dataset="desktop",
-                hierarchy=hierarchy,
-                layout=layout,
-                metadata={
-                    "filename": json_path.name,
-                    "query_type": data.get("query_type"),
-                    "interfaces": data.get("interfaces"),
-                },
-                screenshot_path=None,  # ShowUI samples don't include screenshot files
-            )
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Skipping invalid JSON: {json_path}")
             return None
         except Exception as e:
             logger.error(f"[{self.name}] Error reading {json_path}: {e}")
             return None
+
+        item_id = json_path.stem
+        hierarchy = self._detection_to_hierarchy(data)
+
+        return StandardizedData(
+            id=item_id,
+            source="showui",
+            dataset="desktop",
+            hierarchy=hierarchy,
+            layout=self.to_layout(hierarchy, item_id),
+            metadata={
+                "filename": json_path.name,
+                "query_type": data.get("query_type"),
+                "interfaces": data.get("interfaces"),
+            },
+            screenshot_path=None,
+        )
 
     def _detection_to_hierarchy(self, data: dict) -> dict:
         """Convert flat detections to pseudo-hierarchy.
