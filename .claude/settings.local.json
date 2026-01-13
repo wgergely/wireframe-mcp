@@ -8,7 +8,8 @@
       "Bash(python -m ruff check:*)",
       "Bash(python -m pytest:*)",
       "Bash(ruff format:*)",
-      "Bash(ruff check:*)"
+      "Bash(ruff check:*)",
+      "Bash(git push:*)"
     ]
   }
 }

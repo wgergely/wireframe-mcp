@@ -110,3 +110,45 @@ From `component_legend.json`:
 - WebUI Dataset: https://anthropics.github.io/webui/
 - ScreenSpot: https://huggingface.co/datasets/ScreenSpot
 - UI Complexity Metrics: ResearchGate studies on GUIEvaluator/GUIExaminer
+
+---
+
+## Vector Database Matrix for UI Layouts
+
+Investigated vector databases suitable for storing UI layout embeddings (from JSON trees) and enabling hybrid search for LLM-MCP agents.
+
+### Comparison Matrix
+
+| Feature | **Qdrant** | **Chroma** | **Weaviate** | **Milvus** | **pgvector** |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Type** | Native Vector Search Engine | AI-native Embedding DB | Vector Search Engine | Vector Database | PostgreSQL Extension |
+| **Language** | Rust | Python/Rust | Go | Go | C |
+| **JSON Support** | **Excellent**. JSON payloads. Deep filtering `must`, `should` with nested logic. | **Good**. Metadata dictionary. Mongo-style filtering `$eq`, `$and`. | **Good**. Stores objects with schema. | **Excellent**. JSON data type support. | **Good**. JSONB in Postgres. |
+| **Hybrid Search** | **Strong**. Native dense + sparse vectors. RRF fusion. | **Native**. Dense + Keyword. Simple API. | **Leading**. Built-in BM25 + Vector + Metadata. Configurable alpha. | **Supported**. via multi-vector search. | **Manual**. Combine SQL TSVECTOR + Vector. |
+| **Deployment** | Docker, Cloud, **Local Mode** (Disk/Mem) | **Local (In-process)**, Client/Server | Docker, Cloud, Embedded (experimental) | Docker, K8s, Cloud (Heavyweight) | Standard Postgres |
+| **Ecosystem** | Strong Python SDK, LangChain, LlamaIndex | Very strong Python integration. Simple API. | Strong ecosystem. | Enterprise focused. | Standard SQL tooling. |
+| **Suitability** | **High**. Great balance of performance and structure. | **Medium/High**. Best for prototyping/local agents. | **High**. robust for complex schemas. | **Medium**. Overkill for local corpus generally. | **High**. If already using Postgres. |
+
+### Suitability Analysis for UI Layouts
+
+Storing UI layouts (Rico/WebUI) requires handling:
+1.  **Hierarchical Data**: Trees of components.
+2.  **Metadata**: Bounding boxes, types, text content.
+3.  **Embeddings**: Semantic vector of the screen or component.
+
+**Key Findings:**
+*   **Qdrant**: Best balance. "Payloads" are perfect for storing the raw JSON UI tree (or a simplified version) alongside the vector. The filtering is powerful enough to query "Screens with 'Login Button' AND 'Red Background'".
+*   **Chroma**: Excellent for "Embeddings first" workflows. If the goal is just "Find similar screens", it's the easiest to start with.
+*   **Weaviate**: Strong if defining a strict schema for UI components (e.g. classes for `Button`, `Container`) is desired.
+
+### Recommendations for LLM-MCP Usage
+
+1.  **Primary Recommendation: Qdrant**
+    *   **Why**: It can run locally (Docker) or in-memory for testing, has a highly performant Rust core, and its "payload" system is ideal for unstructured JSON UI trees. The hybrid search is sophisticated (RRF) which helps when mixing "text description" search with "visual layout" search.
+    *   **MCP Fit**: Python client is excellent. Easy to package in a Docker composition with the MCP server.
+
+2.  **Secondary Recommendation: Chroma**
+    *   **Why**: Zero-setup (runs in-process). If the corpus is manageable (<1M screens) and runs directly in the Agent's environment, this is the lowest friction path.
+
+3.  **Alternative: pgvector**
+    *   **Why**: If the project already needs a relational DB for other corpus metadata, adding pgvector is logical to keep a single store.
