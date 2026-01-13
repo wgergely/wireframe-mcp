@@ -1,0 +1,29 @@
+# Development docker-compose for wireframe-mcp
+# Usage: docker-compose -f src/docker/docker-compose.yml up
+
+services:
+  wireframe-mcp:
+    build:
+      context: ../..
+      dockerfile: src/docker/Dockerfile
+    image: wireframe-mcp:dev
+    container_name: wireframe-mcp-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount local corpus data (create ./corpus directory for development)
+      - ./corpus:/app/corpus:rw
+      # Mount config directory
+      - ./config:/app/config:ro
+    environment:
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8080
+      - CORPUS_PATH=/app/corpus
+      - LOG_LEVEL=DEBUG
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "python", "-c", "from src import list_providers; list_providers()" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

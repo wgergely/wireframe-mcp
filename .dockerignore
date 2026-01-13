@@ -1,0 +1,54 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+.venv-win/
+venv/
+venv-win/
+env/
+ENV/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.githooks/
+
+# Agent configuration
+.agent/
+.claude/
+
+# Testing
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+pytestdebug.log
+
+# Documentation
+*.md
+docs/
+
+# Temporary and data files
+data/
+.data/
+tmpclaude*/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment
+.env
