@@ -7,7 +7,7 @@ hierarchical UI structures.
 See: https://d2lang.com/
 """
 
-from src.ir import LayoutNode, Orientation
+from src.mid import LayoutNode, Orientation
 from src.providers.lib import LayoutProvider, register_provider
 
 

@@ -6,7 +6,7 @@ It's ideal for low-fidelity prototypes and has high tolerance for LLM output.
 See: https://plantuml.com/salt
 """
 
-from src.ir import ComponentType, LayoutNode, Orientation
+from src.mid import ComponentType, LayoutNode, Orientation
 from src.providers.lib import LayoutProvider, register_provider
 
 

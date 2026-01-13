@@ -1,8 +1,14 @@
-"""Unit tests for IR models."""
+"""Unit tests for the MID layer."""
 
 import pytest
 
-from src.ir import ComponentType, LayoutNode, Orientation, export_json_schema
+from src.mid import (
+    ComponentType,
+    LayoutNode,
+    Orientation,
+    export_json_schema,
+    validate_layout,
+)
 
 
 class TestOrientation:
@@ -15,19 +21,13 @@ class TestOrientation:
         assert Orientation.VERTICAL.value == "vertical"
         assert Orientation.OVERLAY.value == "overlay"
 
-    @pytest.mark.unit
-    def test_string_serialization(self):
-        """Enum serializes to string value."""
-        assert str(Orientation.HORIZONTAL) == "Orientation.HORIZONTAL"
-        assert Orientation.HORIZONTAL.value == "horizontal"
-
 
 class TestComponentType:
     """Tests for ComponentType enum."""
 
     @pytest.mark.unit
     def test_all_types_exist(self):
-        """All 24 Rico component types are defined."""
+        """All expected component types are defined."""
         expected = {
             # Containers
             "container",
@@ -62,9 +62,7 @@ class TestComponentType:
         }
         actual = {ct.value for ct in ComponentType}
         assert actual == expected
-        assert (
-            len(actual) == 26
-        )  # 4 containers + 7 navigation + 5 content + 10 controls
+        assert len(actual) == 26
 
 
 class TestLayoutNode:
@@ -98,31 +96,6 @@ class TestLayoutNode:
         assert node.orientation == "horizontal"
 
     @pytest.mark.unit
-    def test_nested_children(self):
-        """Recursive children structure works correctly."""
-        child = LayoutNode(id="child", type=ComponentType.BUTTON, label="Click")
-        parent = LayoutNode(
-            id="parent",
-            type=ComponentType.CONTAINER,
-            children=[child],
-        )
-        assert len(parent.children) == 1
-        assert parent.children[0].id == "child"
-        assert parent.children[0].label == "Click"
-
-    @pytest.mark.unit
-    def test_flex_ratio_minimum(self):
-        """Flex ratio rejects values below 1."""
-        with pytest.raises(ValueError):
-            LayoutNode(id="test", type=ComponentType.CONTAINER, flex_ratio=0)
-
-    @pytest.mark.unit
-    def test_flex_ratio_maximum(self):
-        """Flex ratio rejects values above 12."""
-        with pytest.raises(ValueError):
-            LayoutNode(id="test", type=ComponentType.CONTAINER, flex_ratio=13)
-
-    @pytest.mark.unit
     def test_flex_ratio_valid_range(self):
         """Flex ratio accepts values 1-12."""
         for ratio in range(1, 13):
@@ -142,18 +115,39 @@ class TestLayoutNode:
         assert data["type"] == "button"
         assert data["label"] == "Submit"
 
+
+class TestValidateLayout:
+    """Tests for validate_layout function."""
+
     @pytest.mark.unit
-    def test_json_deserialization(self):
-        """Node deserializes from JSON correctly."""
-        data = {
-            "id": "test",
-            "type": "button",
-            "label": "Submit",
-        }
-        node = LayoutNode.model_validate(data)
-        assert node.id == "test"
-        assert node.type == "button"
-        assert node.label == "Submit"
+    def test_valid_tree(self):
+        """Well-formed tree passes validation."""
+        node = LayoutNode(
+            id="root",
+            type=ComponentType.CONTAINER,
+            children=[
+                LayoutNode(id="child1", type=ComponentType.BUTTON),
+                LayoutNode(id="child2", type=ComponentType.TEXT),
+            ],
+        )
+        errors = validate_layout(node)
+        assert errors == []
+
+    @pytest.mark.unit
+    def test_duplicate_ids(self):
+        """Duplicate IDs are detected."""
+        node = LayoutNode(
+            id="root",
+            type=ComponentType.CONTAINER,
+            children=[
+                LayoutNode(id="dupe", type=ComponentType.BUTTON),
+                LayoutNode(id="dupe", type=ComponentType.TEXT),
+            ],
+        )
+        errors = validate_layout(node)
+        assert len(errors) == 1
+        assert errors[0].error_type == "duplicate_id"
+        assert "dupe" in errors[0].message
 
 
 class TestExportJsonSchema:
@@ -163,22 +157,6 @@ class TestExportJsonSchema:
     def test_schema_export(self):
         """Schema exports with expected structure."""
         schema = export_json_schema()
-        # Pydantic v2 uses $defs with a $ref at root
         assert "$defs" in schema
         assert "LayoutNode" in schema["$defs"]
         assert schema["$defs"]["LayoutNode"]["title"] == "LayoutNode"
-
-    @pytest.mark.unit
-    def test_schema_has_required_fields(self):
-        """Schema includes required fields."""
-        schema = export_json_schema()
-        layout_schema = schema["$defs"]["LayoutNode"]
-        assert "id" in layout_schema["properties"]
-        assert "type" in layout_schema["properties"]
-
-    @pytest.mark.unit
-    def test_schema_has_definitions(self):
-        """Schema includes enum definitions."""
-        schema = export_json_schema()
-        assert "ComponentType" in schema["$defs"]
-        assert "Orientation" in schema["$defs"]

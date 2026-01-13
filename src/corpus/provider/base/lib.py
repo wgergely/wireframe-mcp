@@ -6,6 +6,8 @@ from typing import Iterator
 
 from pydantic import BaseModel, ConfigDict
 
+from src.mid import LayoutNode
+
 
 class StandardizedData(BaseModel):
     """Represents a standardized unit of UI data from any provider.
@@ -14,7 +16,8 @@ class StandardizedData(BaseModel):
         id: Unique identifier for this data item.
         source: Name of the data source (e.g., 'rico', 'enrico').
         dataset: Dataset type within the source.
-        hierarchy: The view hierarchy as JSON dict.
+        hierarchy: The view hierarchy as raw JSON dict.
+        layout: The view hierarchy as a LayoutNode (semantic MID).
         metadata: Additional metadata about the item.
         screenshot_path: Path to screenshot image, if available.
     """
@@ -23,6 +26,7 @@ class StandardizedData(BaseModel):
     source: str
     dataset: str
     hierarchy: dict
+    layout: LayoutNode | None = None
     metadata: dict
     screenshot_path: Path | None = None
 

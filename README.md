@@ -12,13 +12,17 @@ When a user asks an LLM to "make a dashboard with a sidebar and floating search"
 
 1. **The Black Box Effect**: No visibility into what the LLM "imagines" before code is written
 2. **Spatial Blindness**: LLMs lack inherent understanding of containment, overlap, docking, and flex relationships
-3. **Wasted Iterations**: Structural errors are discovered only after implementation, requiring costly rewrites
+1.  **The Black Box Effect**: No visibility into what the LLM "imagines" before code is written
+2.  **Spatial Blindness**: LLMs lack inherent understanding of containment, overlap, docking, and flex relationships
+3.  **Wasted Iterations**: Structural errors are discovered only after implementation, requiring costly rewrites
 
 Research (Chen et al. 2025, UIFormer Dec 2025) demonstrates that constraining LLM output to structured schemas improves user preference win rates by ~30% and reduces token consumption by ~50% while improving semantic accuracy.
 
 ## Architecture: The Compiler Pipeline
 
-The system implements a **Three-Stage Compiler** pattern that transforms fuzzy natural language intent into rigid, validated syntax:
+The system implements a **Three-Stage Compiler** pattern that transforms fuzzy natural language intent into rigid, validated syntax. 
+
+For a deep dive into the data flow between **Corpus**, **MID**, and **IR**, see the [Architecture Guide](docs/architecture.md).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -117,11 +121,11 @@ Offers a sketchy, wireframe aesthetic with high tolerance for LLM output variati
 
 | Module              | Status | Description                                              |
 |---------------------|--------|----------------------------------------------------------|
-| `src/ir`            | Done     | Pydantic-based IR with 26 component types                |
-| `src/providers/d2`  | Done     | D2 DSL transpiler with direction/width hints             |
-| `src/providers/plantuml` | Done | PlantUML Salt transpiler with component rendering        |
-| `src/validation`    | Done     | Duplicate ID, flex ratio, and cycle detection            |
-| `src/corpus`        | Done     | Rico dataset download and integration                    |
+| `src/mid`           | Done   | Semantic source of truth (Models & Validation)           |
+| `src/ir`            | Done   | Transpilation context (Bridge to Providers)              |
+| `src/providers/d2`  | Done   | D2 DSL transpiler with direction/width hints             |
+| `src/providers/plantuml` | Done | PlantUML Salt transpiler with component rendering      |
+| `src/corpus`        | Done   | Rico dataset download and integration                    |
 
 ### In Progress / Planned
 
