@@ -18,7 +18,23 @@
       "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -m pytest src/corpus/normalizer/test.py -v)",
       "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -c \"import bs4; print\\(''bs4:'', bs4.__version__\\)\")",
       "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" scripts/audit_websight.py)",
-      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -m pytest src/corpus/normalizer/test_html.py -v)"
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -m pytest src/corpus/normalizer/test_html.py -v)",
+      "Bash(Y:\\\\code\\\\wireframe-mcp-worktrees\\\\venv-win\\\\Scripts\\\\pip.exe install:*)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/Scripts/pip.exe install:*)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe -m pytest src/vector/test.py -v)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe:*)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/Scripts/ruff.exe check src/vector/)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/Scripts/ruff.exe format --check src/vector/)",
+      "Bash(conda:*)",
+      "Bash(curl:*)",
+      "Bash(start //wait /tmp/miniconda.exe /InstallationType=JustMe /RegisterPython=0 /AddToPath=0 /S /D=C:\\\\miniconda3)",
+      "Bash(/c/miniconda3/Scripts/conda.exe:*)",
+      "Bash(/c/Users/hello/miniconda3/Scripts/conda.exe tos accept:*)",
+      "Bash(/c/Users/hello/miniconda3/Scripts/conda.exe install:*)",
+      "Bash(/c/Users/hello/miniconda3/Scripts/conda.exe create:*)",
+      "Bash(/y/code/wireframe-mcp-worktrees/conda-win/python.exe -m pip install:*)",
+      "Bash(/y/code/wireframe-mcp-worktrees/conda-win/python.exe -c:*)",
+      "Bash(# Find faiss related files in conda env echo \"\"=== FAISS package files ===\"\" ls -la /y/code/wireframe-mcp-worktrees/conda-win/Lib/site-packages/faiss/)"
     ]
   }
 }
