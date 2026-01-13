@@ -1,1 +1,1 @@
-@../.agent/workflows/create-feature.md
+@../.agent/workflows/new-branch.md

@@ -1,1 +1,1 @@
-@../../.agent/workflows/ruff-and-push.md
+@../../.agent/workflows/commit.md
