@@ -15,6 +15,7 @@ class Provider(BaseProvider):
 
     @property
     def name(self) -> str:
+        """Provider name."""
         return "websight"
 
     def fetch(self, force: bool = False) -> None:
@@ -22,16 +23,14 @@ class Provider(BaseProvider):
 
         Currently a placeholder as WebSight requires HuggingFace authentication
         or 'datasets' library for efficient streaming.
-
-        For now, this ensures the directory exists and warns the user.
         """
         dest_dir = self.data_dir / "websight"
         dest_dir.mkdir(parents=True, exist_ok=True)
 
         if not any(dest_dir.iterdir()):
             print(
-                f"[{self.name}] Automatic download not yet implemented "
-                "for WebSight (2M+ items)."
+                f"[{self.name}] Automatic download not yet implemented for WebSight "
+                "(2M+ items)."
             )
             print(f"Please manually place parquet/jsonl files in: {dest_dir}")
 
@@ -40,8 +39,6 @@ class Provider(BaseProvider):
         src_dir = self.data_dir / "websight"
         if not src_dir.exists():
             return
-
         # Placeholder for processing logic
-        # Would iterate over parquet/jsonl files
-        # Yield StandardizedData
-        pass
+        # Would iterate over parquet/jsonl files and yield StandardizedData
+        yield from []

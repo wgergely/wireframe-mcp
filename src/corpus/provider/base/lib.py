@@ -8,13 +8,22 @@ from pydantic import BaseModel, ConfigDict
 
 
 class StandardizedData(BaseModel):
-    """Represents a standardized unit of UI data from any provider."""
+    """Represents a standardized unit of UI data from any provider.
+
+    Attributes:
+        id: Unique identifier for this data item.
+        source: Name of the data source (e.g., 'rico', 'enrico').
+        dataset: Dataset type within the source.
+        hierarchy: The view hierarchy as JSON dict.
+        metadata: Additional metadata about the item.
+        screenshot_path: Path to screenshot image, if available.
+    """
 
     id: str
     source: str
     dataset: str
-    hierarchy: dict  # The view hierarchy (JSON)
-    metadata: dict  # Additional metadata
+    hierarchy: dict
+    metadata: dict
     screenshot_path: Path | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -26,14 +35,17 @@ class BaseProvider(abc.ABC):
     A provider is responsible for:
     1. Fetching raw data (downloading).
     2. Extracting raw data (unzipping/processing).
-    3. PRODUCING a stream of StandardizedData.
+    3. Producing a stream of StandardizedData.
+
+    Attributes:
+        data_dir: Root directory for storing provider data.
     """
 
     def __init__(self, data_dir: Path):
         """Initialize the provider.
 
         Args:
-            data_dir: The root directory where corpus data should be stored.
+            data_dir: Root directory where corpus data should be stored.
         """
         self.data_dir = data_dir
 
@@ -41,25 +53,22 @@ class BaseProvider(abc.ABC):
     @abc.abstractmethod
     def name(self) -> str:
         """Unique identifier for this provider."""
-        pass
 
     @abc.abstractmethod
     def fetch(self, force: bool = False) -> None:
         """Download or retrieve the raw data.
 
         Args:
-            force: If True, force re-download even if data appears to exist.
+            force: If True, force re-download even if data exists.
         """
-        pass
 
     @abc.abstractmethod
     def process(self) -> Iterator[StandardizedData]:
-        """Process the raw data and yield standardized data items.
+        """Process raw data and yield standardized data items.
 
-        This method should handle reading the raw files (after fetch is called)
-        and converting them into StandardizedData objects.
+        This method reads the raw files (after fetch is called) and
+        converts them into StandardizedData objects.
 
         Yields:
-            StandardizedData: The standardized data items.
+            StandardizedData items from the provider.
         """
-        pass

@@ -4,3 +4,4 @@
 @../.agent/rules/py-testing.md
 @../.agent/rules/repo-rules.md
 @../.agent/rules/py-imports.md
+@../.agent/rules/cli-usage.md

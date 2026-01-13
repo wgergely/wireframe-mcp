@@ -16,24 +16,19 @@ def cmd_download(args: argparse.Namespace) -> int:
     """Handle the download command."""
     try:
         manager = CorpusManager(data_dir=args.data_dir)
-        provider_name = args.provider
-
-        manager.fetch_dataset(provider_name, force=args.force)
-
-        # Let's just say "Success".
-        print(f"\nSuccess! Dataset '{provider_name}' is ready.")
+        manager.fetch_dataset(args.provider, force=args.force)
+        print(f"\nSuccess! Dataset '{args.provider}' is ready.")
         return 0
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
 
-def cmd_datasets(args: argparse.Namespace) -> int:
+def cmd_datasets(_args: argparse.Namespace) -> int:
     """Handle the datasets command."""
     manager = CorpusManager()
-    providers = manager.list_providers()
     print("Available Providers:\n")
-    for name in providers:
+    for name in manager.list_providers():
         print(f"  {name}")
     return 0
 
@@ -112,9 +107,9 @@ def handle_corpus_command(argv: list[str]) -> int:
     return args.func(args)
 
 
-def cmd_test(extra_args):
+def cmd_test(extra_args: list[str]) -> int:
     """Run pytest with provided arguments."""
-    cmd = [sys.executable, "-m", "pytest"] + extra_args
+    cmd = [sys.executable, "-m", "pytest", *extra_args]
     print(f"Running: {' '.join(cmd)}")
     try:
         return subprocess.call(cmd)
@@ -122,20 +117,15 @@ def cmd_test(extra_args):
         return 130
 
 
-def cmd_build(extra_args):
+def cmd_build(extra_args: list[str]) -> int:
     """Run docker compose commands."""
     compose_file = Path("src/docker/docker-compose.yml")
     if not compose_file.exists():
         print(f"Error: {compose_file} not found.")
         return 1
 
-    base_cmd = ["docker", "compose", "-f", str(compose_file)]
-
-    if not extra_args:
-        # Default to build if no args provided
-        final_cmd = base_cmd + ["build"]
-    else:
-        final_cmd = base_cmd + extra_args
+    action = extra_args if extra_args else ["build"]
+    final_cmd = ["docker", "compose", "-f", str(compose_file), *action]
 
     print(f"Running: {' '.join(final_cmd)}")
     try:
@@ -144,7 +134,8 @@ def cmd_build(extra_args):
         return 130
 
 
-def show_help():
+def show_help() -> None:
+    """Display CLI help message."""
     print("Usage: python . {corpus|test|build} [args]")
     print("\nCommands:")
     print("  corpus   Manage corpus data (download, list)")
@@ -156,7 +147,8 @@ def show_help():
     print("  python . build up -d")
 
 
-def main():
+def main() -> int:
+    """Main entry point for the CLI."""
     if len(sys.argv) < 2:
         show_help()
         return 1
@@ -168,19 +160,18 @@ def main():
         show_help()
         return 0
 
-    if command == "corpus":
-        return handle_corpus_command(rest_args)
+    commands = {
+        "corpus": lambda: handle_corpus_command(rest_args),
+        "test": lambda: cmd_test(rest_args),
+        "build": lambda: cmd_build(rest_args),
+    }
 
-    elif command == "test":
-        return cmd_test(rest_args)
+    if command in commands:
+        return commands[command]()
 
-    elif command == "build":
-        return cmd_build(rest_args)
-
-    else:
-        print(f"Unknown command: {command}")
-        show_help()
-        return 1
+    print(f"Unknown command: {command}")
+    show_help()
+    return 1
 
 
 if __name__ == "__main__":

@@ -10,18 +10,21 @@ class Provider(BaseProvider):
 
     @property
     def name(self) -> str:
+        """Provider name."""
         return "egfe"
 
     def fetch(self, force: bool = False) -> None:
-        """Download EGFE data."""
+        """Download EGFE data.
+
+        Placeholder for Zenodo download logic.
+        """
         dest_dir = self.data_dir / "egfe"
         dest_dir.mkdir(parents=True, exist_ok=True)
-        # Placeholder for Zenodo download logic
-        # URL would be something like https://zenodo.org/record/XXXXX/files/egfe.zip
 
     def process(self) -> Iterator[StandardizedData]:
         """Process EGFE data."""
         src_dir = self.data_dir / "egfe"
         if not src_dir.exists():
             return
-        pass
+        # Placeholder for processing logic
+        yield from []

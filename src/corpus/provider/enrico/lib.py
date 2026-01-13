@@ -2,6 +2,7 @@
 
 import json
 import zipfile
+from pathlib import Path
 from typing import Iterator
 from urllib.request import urlretrieve
 
@@ -17,19 +18,28 @@ class Provider(BaseProvider):
 
     @property
     def name(self) -> str:
+        """Provider name."""
         return "enrico"
+
+    @property
+    def _dest_dir(self) -> Path:
+        """Base directory for Enrico data."""
+        return self.data_dir / "enrico"
+
+    @property
+    def _extract_dir(self) -> Path:
+        """Directory where the dataset is extracted."""
+        return self._dest_dir / "extracted"
 
     def fetch(self, force: bool = False) -> None:
         """Download and extract Enrico dataset."""
-        dest_dir = self.data_dir / "enrico"
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        self._dest_dir.mkdir(parents=True, exist_ok=True)
 
-        zip_path = dest_dir / "enrico.zip"
-        extract_dir = dest_dir / "extracted"
-
-        if extract_dir.exists() and not force:
-            print(f"[{self.name}] Dataset already exists at {extract_dir}")
+        if self._extract_dir.exists() and not force:
+            print(f"[{self.name}] Dataset already exists at {self._extract_dir}")
             return
+
+        zip_path = self._dest_dir / "enrico.zip"
 
         print(f"[{self.name}] Downloading from {self.ENRICO_URL}...")
         try:
@@ -38,43 +48,38 @@ class Provider(BaseProvider):
             raise ConnectionError(f"[{self.name}] Download failed: {e}") from e
 
         print(f"[{self.name}] Extracting...")
-        extract_dir.mkdir(parents=True, exist_ok=True)
+        self._extract_dir.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(extract_dir)
+            zf.extractall(self._extract_dir)
 
-        # Clean up zip? Maybe keep it for cache.
-        print(f"[{self.name}] Ready at {extract_dir}")
+        print(f"[{self.name}] Ready at {self._extract_dir}")
 
     def process(self) -> Iterator[StandardizedData]:
-        """Process Enrico data."""
-        extract_dir = self.data_dir / "enrico" / "extracted"
-        if not extract_dir.exists():
+        """Process Enrico data and yield standardized items."""
+        if not self._extract_dir.exists():
             raise FileNotFoundError(f"[{self.name}] Run fetch() first.")
 
-        # Structure of Enrico zip usually:
-        # screenshots/
-        # hierarchies/
-        # ...
-        # OR it might be flat.
-        # I'll implement a resilient walker.
+        for json_path in self._extract_dir.rglob("*.json"):
+            item = self._process_json_file(json_path)
+            if item:
+                yield item
 
-        for json_file in extract_dir.rglob("*.json"):
-            try:
-                with open(json_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
+    def _process_json_file(self, json_path: Path) -> StandardizedData | None:
+        """Process a single JSON file and return StandardizedData."""
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
 
-                # Check if it's a hierarchy
-                # Enrico/Rico usually has 'children' or 'activity_name'
-
-                yield StandardizedData(
-                    id=json_file.stem,
-                    source="enrico",
-                    dataset="default",
-                    hierarchy=data,
-                    metadata={"filename": json_file.name},
-                    screenshot_path=json_file.with_suffix(
-                        ".jpg"
-                    ),  # Enrico often uses jpg
-                )
-            except Exception as e:
-                print(f"[{self.name}] Error reading {json_file}: {e}")
+            # Enrico often uses jpg for screenshots
+            screenshot_path = json_path.with_suffix(".jpg")
+            return StandardizedData(
+                id=json_path.stem,
+                source="enrico",
+                dataset="default",
+                hierarchy=data,
+                metadata={"filename": json_path.name},
+                screenshot_path=screenshot_path if screenshot_path.exists() else None,
+            )
+        except Exception as e:
+            print(f"[{self.name}] Error reading {json_path}: {e}")
+            return None

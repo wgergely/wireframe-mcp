@@ -9,7 +9,6 @@ from urllib.request import urlretrieve
 
 from src.corpus.provider.base import BaseProvider, StandardizedData
 
-# Rico dataset URLs
 RICO_DATASETS = {
     "semantic": {
         "url": "https://storage.googleapis.com/crowdstf-rico-uiuc-4540/rico_dataset_v0.1/semantic_annotations.zip",
@@ -40,12 +39,19 @@ class Provider(BaseProvider):
     """Provider for the Rico UI dataset."""
 
     def __init__(self, data_dir: Path, dataset_type: RicoDatasetType = "semantic"):
+        """Initialize the Rico provider.
+
+        Args:
+            data_dir: Root directory for storing data.
+            dataset_type: Which Rico dataset variant to use.
+        """
         super().__init__(data_dir)
         self.dataset_type = dataset_type
         self.dataset_info = RICO_DATASETS[dataset_type]
 
     @property
     def name(self) -> str:
+        """Provider name including dataset type."""
         return f"rico_{self.dataset_type}"
 
     @property
@@ -71,71 +77,67 @@ class Provider(BaseProvider):
         output_path = self._base_dir / filename
 
         print(f"Downloading Rico {self.dataset_type} dataset from {url}...")
+        self._download_with_progress(url, output_path)
 
-        # Simple download with progress
-        def _progress_hook(block_num: int, block_size: int, total_size: int) -> None:
+        print(f"Extracting to {self._extract_dir}...")
+        self._extract_archive(output_path)
+        print(f"Dataset ready at {self._extract_dir}")
+
+    def _download_with_progress(self, url: str, output_path: Path) -> None:
+        """Download file with progress reporting."""
+
+        def progress_hook(block_num: int, block_size: int, total_size: int) -> None:
             if total_size > 0:
-                downloaded = block_num * block_size
-                percent = min(100, (downloaded / total_size) * 100)
-                print(f"\r  Progress: {percent:.1f}%", end="", flush=True)
+                percent = min(100, (block_num * block_size / total_size) * 100)
+                print(f"  Progress: {percent:.1f}%", end="\r", flush=True)
 
         try:
-            urlretrieve(url, output_path, reporthook=_progress_hook)
+            urlretrieve(url, output_path, reporthook=progress_hook)
             print()
         except Exception as e:
             raise ConnectionError(f"Failed to download {url}: {e}") from e
 
-        print(f"Extracting to {self._extract_dir}...")
+    def _extract_archive(self, archive_path: Path) -> None:
+        """Extract archive to the extract directory."""
         self._extract_dir.mkdir(parents=True, exist_ok=True)
 
-        if output_path.suffix == ".gz" or output_path.name.endswith(".tar.gz"):
-            with tarfile.open(output_path, "r:gz") as tar:
+        if archive_path.name.endswith(".tar.gz"):
+            with tarfile.open(archive_path, "r:gz") as tar:
                 tar.extractall(path=self._extract_dir)
-        elif output_path.suffix == ".zip":
-            with zipfile.ZipFile(output_path, "r") as zf:
+        elif archive_path.suffix == ".zip":
+            with zipfile.ZipFile(archive_path, "r") as zf:
                 zf.extractall(path=self._extract_dir)
 
-        print(f"Dataset ready at {self._extract_dir}")
-
     def process(self) -> Iterator[StandardizedData]:
-        """Process Rico data (starting with Semantic)."""
+        """Process Rico data and yield standardized items."""
         if not self._extract_dir.exists():
             raise FileNotFoundError(
                 f"Dataset not found at {self._extract_dir}. Run fetch() first."
             )
 
-        # Logic depends on dataset type.
-        # For 'semantic', it's a zip containing JSONs (and pngs, structure varies).
-        # Assuming the semantic zip extracts a folder which contains the JSONs.
+        for json_path in self._extract_dir.rglob("*.json"):
+            item = self._process_json_file(json_path)
+            if item:
+                yield item
 
-        # We need to explore the extracted directory to find the files.
-        # Based on previous knowledge, 'semantic_annotations.zip' likely contains a folder.
+    def _process_json_file(self, json_path: Path) -> StandardizedData | None:
+        """Process a single JSON file and return StandardizedData."""
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
 
-        # Let's try to walk the directory
-        for file_path in self._extract_dir.rglob("*.json"):
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-
-                # Rico Semantic JSONs usually have "children" or "hierarchy"
-                # They are file-per-screen.
-                file_id = file_path.stem
-
-                # We need to constructing StandardizedData
-                # Rico semantic JSON IS the view hierarchy.
-
-                screenshot_path = file_path.with_suffix(".png")
-                yield StandardizedData(
-                    id=file_id,
-                    source="rico",
-                    dataset=self.dataset_type,
-                    hierarchy=data,
-                    metadata={"filename": file_path.name},
-                    screenshot_path=(
-                        screenshot_path if screenshot_path.exists() else None
-                    ),
-                )
-            except json.JSONDecodeError:
-                print(f"Skipping invalid JSON: {file_path}")
-            except Exception as e:
-                print(f"Error processing {file_path}: {e}")
+            screenshot_path = json_path.with_suffix(".png")
+            return StandardizedData(
+                id=json_path.stem,
+                source="rico",
+                dataset=self.dataset_type,
+                hierarchy=data,
+                metadata={"filename": json_path.name},
+                screenshot_path=screenshot_path if screenshot_path.exists() else None,
+            )
+        except json.JSONDecodeError:
+            print(f"Skipping invalid JSON: {json_path}")
+            return None
+        except Exception as e:
+            print(f"Error processing {json_path}: {e}")
+            return None

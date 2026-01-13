@@ -10,7 +10,8 @@
       "Bash(ruff format:*)",
       "Bash(ruff check:*)",
       "Bash(git push:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(python:*)"
     ]
   }
 }

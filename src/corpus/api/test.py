@@ -53,3 +53,7 @@ class TestCorpusManager:
         # Should have defaults
         providers = manager.list_providers()
         assert "rico_semantic" in providers
+        assert "websight" in providers
+        assert "egfe" in providers
+        assert "showui" in providers
+        assert "enrico" in providers
