@@ -1,7 +1,14 @@
+# Development & Linting
 ruff
 pytest
+
+# Core & Data Models
+pydantic
+
+# Vector Database & Math
 faiss-gpu
 numpy
-pydantic
+
+# Data Fetching & Datasets
 datasets
 Pillow
