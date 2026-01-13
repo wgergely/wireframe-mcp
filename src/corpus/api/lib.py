@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Iterator
 
+from src.config import get_data_dir
 from src.corpus.provider.base import BaseProvider, StandardizedData
 from src.corpus.provider.egfe import Provider as EgfeProvider
 from src.corpus.provider.enrico import Provider as EnricoProvider
@@ -10,6 +11,8 @@ from src.corpus.provider.rico import Provider as RicoProvider
 from src.corpus.provider.rico.lib import RICO_DATASETS
 from src.corpus.provider.showui import Provider as ShowUIProvider
 from src.corpus.provider.websight import Provider as WebSightProvider
+
+__all__ = ["CorpusManager"]
 
 
 class CorpusManager:
@@ -19,9 +22,11 @@ class CorpusManager:
         """Initialize the CorpusManager.
 
         Args:
-            data_dir: Root directory for corpus data. Defaults to ./data.
+            data_dir: Root directory for corpus data.
+                Defaults to {repo_root}/.corpus/data.
+                Can be overridden with CORPUS_DATA_DIR environment variable.
         """
-        self.data_dir = Path(data_dir) if data_dir else Path.cwd() / "data"
+        self.data_dir = get_data_dir(data_dir)
         self.providers: dict[str, BaseProvider] = {}
         self._register_default_providers()
 
@@ -76,7 +81,7 @@ class CorpusManager:
         Yields:
             StandardizedData items from the provider.
         """
-        return self.get_provider(provider_name).process()
+        yield from self.get_provider(provider_name).process()
 
     def list_providers(self) -> list[str]:
         """List available provider names."""
