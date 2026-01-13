@@ -1,5 +1,9 @@
 .agent/profile
 
+# External datasets (not committed)
+data/
+.data/
+
 # tmpclaude
 tmpclaude*
 tmpclaude*/
