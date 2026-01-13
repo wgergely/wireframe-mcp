@@ -1,4 +1,4 @@
-"""Ad-hoc audit script for Rico provider pipeline."""
+"""Ad-hoc audit script for EGFE provider pipeline."""
 
 import sys
 from pathlib import Path
@@ -10,10 +10,23 @@ sys.path.insert(0, str(project_root))
 from src.corpus import CorpusManager  # noqa: E402
 
 
-def audit_rico_pipeline():
-    """Audit the Rico provider pipeline step by step."""
+def collect_labels(node: dict) -> set:
+    """Recursively collect all componentLabel or type values."""
+    labels = set()
+    if "componentLabel" in node:
+        labels.add(node["componentLabel"])
+    if "type" in node:
+        labels.add(node["type"])
+    if "children" in node:
+        for child in node["children"]:
+            labels.update(collect_labels(child))
+    return labels
+
+
+def audit_egfe_pipeline():
+    """Audit the EGFE provider pipeline step by step."""
     print("=" * 60)
-    print("RICO PROVIDER AUDIT")
+    print("EGFE PROVIDER AUDIT")
     print("=" * 60)
 
     # Step 1: Initialize CorpusManager
@@ -21,31 +34,35 @@ def audit_rico_pipeline():
     data_dir = Path(__file__).parent.parent / "data"
     manager = CorpusManager(data_dir=data_dir)
     print(f"  Data directory: {manager.data_dir}")
-    print(f"  Available providers: {manager.list_providers()}")
 
-    # Step 2: Get Rico provider
-    print("\n[Step 2] Getting rico_semantic provider...")
+    # Step 2: Get EGFE provider
+    print("\n[Step 2] Getting egfe provider...")
     try:
-        provider = manager.get_provider("rico_semantic")
+        provider = manager.get_provider("egfe")
         print(f"  Provider name: {provider.name}")
-        print(f"  Provider type: {type(provider).__name__}")
+        print(f"  Dest dir: {provider._dest_dir}")
     except KeyError as e:
         print(f"  ERROR: {e}")
         return False
 
-    # Step 3: Check if data exists
-    print("\n[Step 3] Checking if data exists...")
-    extract_dir = provider._extract_dir
-    print(f"  Extract directory: {extract_dir}")
-    print(f"  Directory exists: {extract_dir.exists()}")
-
-    if not extract_dir.exists():
-        print("  WARNING: Data not downloaded. Run fetch() first.")
-        return False
+    # Step 3: Check if data exists, fetch if needed
+    print("\n[Step 3] Checking/fetching data...")
+    if not provider._has_data():
+        print("  Data not found, attempting download...")
+        try:
+            manager.fetch_dataset("egfe")
+            print("  Download complete!")
+        except Exception as e:
+            print(f"  ERROR during fetch: {e}")
+            print("  NOTE: If download fails, manually place EGFE data in:")
+            print(f"        {provider._dest_dir}")
+            return False
+    else:
+        print(f"  Data exists at {provider._dest_dir}")
 
     # Count files
-    json_files = list(extract_dir.rglob("*.json"))
-    png_files = list(extract_dir.rglob("*.png"))
+    json_files = list(provider._dest_dir.rglob("*.json"))
+    png_files = list(provider._dest_dir.rglob("*.png"))
     print(f"  JSON files: {len(json_files)}")
     print(f"  PNG files: {len(png_files)}")
 
@@ -54,42 +71,46 @@ def audit_rico_pipeline():
     items = []
     sample_size = 100
 
-    for i, item in enumerate(manager.stream_data("rico_semantic")):
-        if i >= sample_size:
-            break
-        items.append(item)
+    try:
+        for i, item in enumerate(manager.stream_data("egfe")):
+            if i >= sample_size:
+                break
+            items.append(item)
+        print(f"  Successfully streamed {len(items)} items")
+    except Exception as e:
+        print(f"  ERROR during streaming: {e}")
+        return False
 
-    print(f"  Successfully streamed {len(items)} items")
+    if not items:
+        print("  WARNING: No items streamed!")
+        return False
 
     # Step 5: Validate StandardizedData fields
     print("\n[Step 5] Validating StandardizedData fields...")
     validation_results = {
         "has_id": 0,
-        "has_source": 0,
+        "has_source_egfe": 0,
         "has_dataset": 0,
         "has_hierarchy": 0,
         "has_layout": 0,
         "has_screenshot": 0,
-        "hierarchy_has_children": 0,
-        "hierarchy_has_bounds": 0,
-        "hierarchy_has_component_label": 0,
+        "hierarchy_has_type": 0,
+        "hierarchy_has_name": 0,
     }
 
     for item in items:
         if item.id:
             validation_results["has_id"] += 1
-        if item.source == "rico":
-            validation_results["has_source"] += 1
-        if item.dataset == "semantic":
+        if item.source == "egfe":
+            validation_results["has_source_egfe"] += 1
+        if item.dataset:
             validation_results["has_dataset"] += 1
         if item.hierarchy:
             validation_results["has_hierarchy"] += 1
-            if "children" in item.hierarchy:
-                validation_results["hierarchy_has_children"] += 1
-            if "bounds" in item.hierarchy:
-                validation_results["hierarchy_has_bounds"] += 1
-            if "componentLabel" in item.hierarchy:
-                validation_results["hierarchy_has_component_label"] += 1
+            if "type" in item.hierarchy:
+                validation_results["hierarchy_has_type"] += 1
+            if "name" in item.hierarchy:
+                validation_results["hierarchy_has_name"] += 1
         if item.layout is not None:
             validation_results["has_layout"] += 1
         if item.screenshot_path is not None:
@@ -111,10 +132,24 @@ def audit_rico_pipeline():
         print(f"  screenshot_path: {sample.screenshot_path}")
         print(f"  layout: {sample.layout}")
         print(f"  hierarchy keys: {list(sample.hierarchy.keys())[:10]}")
-        print(f"  metadata: {sample.metadata}")
 
-    # Step 7: Check screenshot files exist
-    print("\n[Step 7] Validating screenshot file existence...")
+    # Step 7: Analyze element types
+    print("\n[Step 7] Analyzing element types...")
+    all_labels = set()
+    total_labels = 0
+    for item in items:
+        labels = collect_labels(item.hierarchy)
+        all_labels.update(labels)
+        total_labels += len(labels)
+
+    print(f"  Unique types/labels found: {len(all_labels)}")
+    print(f"  Average types per item: {total_labels / len(items):.1f}")
+    if all_labels:
+        sample_labels = sorted(all_labels)[:20]
+        print(f"  Sample types: {sample_labels}")
+
+    # Step 8: Check screenshot files exist
+    print("\n[Step 8] Validating screenshot file existence...")
     screenshots_found = 0
     screenshots_missing = 0
     for item in items:
@@ -136,26 +171,24 @@ def audit_rico_pipeline():
 
     issues = []
     if validation_results["has_layout"] == 0:
-        issues.append("CRITICAL: layout field is never populated (always None)")
-    if validation_results["hierarchy_has_component_label"] < len(items) * 0.5:
-        issues.append(
-            "WARNING: Less than 50% of items have componentLabel in hierarchy"
-        )
+        issues.append("NOTE: layout field is not populated (expected for raw JSON)")
+    if validation_results["has_screenshot"] < len(items) * 0.5:
+        issues.append("WARNING: Less than 50% of items have screenshots")
     if screenshots_missing > 0:
         issues.append(
             f"WARNING: {screenshots_missing} screenshot paths reference missing files"
         )
 
     if issues:
-        print("\nIssues found:")
+        print("\nNotes/Warnings:")
         for issue in issues:
             print(f"  - {issue}")
     else:
         print("\n[OK] No major issues found")
 
-    return len(issues) == 0
+    return len([i for i in issues if i.startswith("WARNING")]) == 0
 
 
 if __name__ == "__main__":
-    success = audit_rico_pipeline()
+    success = audit_egfe_pipeline()
     sys.exit(0 if success else 1)

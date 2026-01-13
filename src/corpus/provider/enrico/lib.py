@@ -7,6 +7,7 @@ from typing import Iterator
 from urllib.request import urlretrieve
 
 from src.core import get_logger
+from src.corpus.normalizer import normalize_enrico_hierarchy
 from src.corpus.provider.base import BaseProvider, StandardizedData
 
 logger = get_logger("provider.enrico")
@@ -67,9 +68,7 @@ class Provider(BaseProvider):
 
         logger.info(f"[{self.name}] Ready at {self._dest_dir}")
 
-    def _download_and_extract(
-        self, name: str, url: str, extract_dir: Path
-    ) -> None:
+    def _download_and_extract(self, name: str, url: str, extract_dir: Path) -> None:
         """Download and extract a single archive."""
         zip_path = self._dest_dir / f"{name}.zip"
 
@@ -90,9 +89,7 @@ class Provider(BaseProvider):
             raise FileNotFoundError(f"[{self.name}] Run fetch() first.")
 
         # Build screenshot lookup once for efficiency
-        screenshot_lookup = {
-            p.stem: p for p in self._screenshots_dir.rglob("*.jpg")
-        }
+        screenshot_lookup = {p.stem: p for p in self._screenshots_dir.rglob("*.jpg")}
 
         for json_path in self._hierarchies_dir.rglob("*.json"):
             item = self._process_json_file(json_path, screenshot_lookup)

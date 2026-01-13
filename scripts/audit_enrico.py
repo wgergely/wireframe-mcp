@@ -7,7 +7,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.corpus import CorpusManager
+from src.corpus import CorpusManager  # noqa: E402
 
 
 def collect_labels(node: dict) -> set:
@@ -59,8 +59,16 @@ def audit_enrico_pipeline():
 
     # Count files
     json_files = list(provider._hierarchies_dir.rglob("*.json"))
-    jpg_files = list(provider._screenshots_dir.rglob("*.jpg")) if provider._screenshots_dir.exists() else []
-    png_files = list(provider._screenshots_dir.rglob("*.png")) if provider._screenshots_dir.exists() else []
+    jpg_files = (
+        list(provider._screenshots_dir.rglob("*.jpg"))
+        if provider._screenshots_dir.exists()
+        else []
+    )
+    png_files = (
+        list(provider._screenshots_dir.rglob("*.png"))
+        if provider._screenshots_dir.exists()
+        else []
+    )
     print(f"  JSON files: {len(json_files)}")
     print(f"  JPG files: {len(jpg_files)}")
     print(f"  PNG files: {len(png_files)}")
@@ -159,9 +167,8 @@ def audit_enrico_pipeline():
 
     print(f"  Screenshots found: {screenshots_found}")
     print(f"  Screenshots missing: {screenshots_missing}")
-    print(
-        f"  Items without screenshot_path: {len(items) - screenshots_found - screenshots_missing}"
-    )
+    no_screenshot = len(items) - screenshots_found - screenshots_missing
+    print(f"  Items without screenshot_path: {no_screenshot}")
 
     # Summary
     print("\n" + "=" * 60)

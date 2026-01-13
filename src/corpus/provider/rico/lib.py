@@ -8,6 +8,7 @@ from typing import Iterator, Literal
 from urllib.request import urlretrieve
 
 from src.core import get_logger
+from src.corpus.normalizer import normalize_rico_hierarchy
 from src.corpus.provider.base import BaseProvider, StandardizedData
 
 logger = get_logger("provider.rico")
@@ -132,11 +133,17 @@ class Provider(BaseProvider):
                 data = json.load(f)
 
             screenshot_path = json_path.with_suffix(".png")
+            item_id = json_path.stem
+
+            # Normalize hierarchy to LayoutNode
+            layout = normalize_rico_hierarchy(data, item_id)
+
             return StandardizedData(
-                id=json_path.stem,
+                id=item_id,
                 source="rico",
                 dataset=self.dataset_type,
                 hierarchy=data,
+                layout=layout,
                 metadata={"filename": json_path.name},
                 screenshot_path=screenshot_path if screenshot_path.exists() else None,
             )
