@@ -114,7 +114,11 @@ class PlantUMLProvider(LayoutProvider):
             return "{#"
 
         # Tabbed panel for navbar/drawer
-        if node.type in (ComponentType.NAVBAR, ComponentType.DRAWER, ComponentType.TAB_BAR):
+        if node.type in (
+            ComponentType.NAVBAR,
+            ComponentType.DRAWER,
+            ComponentType.TAB_BAR,
+        ):
             return "{+"
 
         # Default grouping

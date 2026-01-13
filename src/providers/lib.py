@@ -122,6 +122,7 @@ def list_providers() -> list[str]:
 def _import_providers() -> None:
     """Import provider modules to trigger registration."""
     import importlib
+
     for module_name in ("d2", "plantuml"):
         try:
             importlib.import_module(f"src.providers.{module_name}")

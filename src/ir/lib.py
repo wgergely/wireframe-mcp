@@ -27,7 +27,7 @@ class Orientation(str, Enum):
 
 
 class ComponentType(str, Enum):
-    """Rico-based UI component taxonomy (24 categories).
+    """Rico-based UI component taxonomy (26 categories).
 
     These categories are derived from Rico dataset semantic annotations,
     providing a standardized vocabulary for UI components that enables
@@ -35,10 +35,11 @@ class ComponentType(str, Enum):
 
     Categories:
         Containers: container, card, modal, web_view
-        Navigation: toolbar, navbar, bottom_nav, drawer, tab_bar, multi_tab, pager_indicator
+        Navigation: toolbar, navbar, bottom_nav, drawer, tab_bar,
+                    multi_tab, pager_indicator
         Content: text, image, list_item, icon, advertisement
-        Controls: button, text_button, input, checkbox, radio_button, switch,
-                  slider, spinner, date_picker, number_stepper
+        Controls: button, text_button, input, checkbox, radio_button,
+                  switch, slider, spinner, date_picker, number_stepper
     """
 
     # Containers
@@ -148,8 +149,8 @@ class LayoutNode(BaseModel):
 
     Example:
         >>> node = LayoutNode(
-        ...     id="sidebar",
-        ...     type=ComponentType.SIDEBAR,
+        ...     id="drawer",
+        ...     type=ComponentType.DRAWER,
         ...     label="Navigation",
         ...     flex_ratio=3,
         ... )

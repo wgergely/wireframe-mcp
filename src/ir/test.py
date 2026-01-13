@@ -62,7 +62,9 @@ class TestComponentType:
         }
         actual = {ct.value for ct in ComponentType}
         assert actual == expected
-        assert len(actual) == 26  # 4 containers + 7 navigation + 5 content + 10 controls
+        assert (
+            len(actual) == 26
+        )  # 4 containers + 7 navigation + 5 content + 10 controls
 
 
 class TestLayoutNode:
@@ -83,14 +85,14 @@ class TestLayoutNode:
     def test_full_node(self):
         """Create node with all fields specified."""
         node = LayoutNode(
-            id="sidebar",
-            type=ComponentType.SIDEBAR,
+            id="drawer",
+            type=ComponentType.DRAWER,
             label="Navigation",
             flex_ratio=3,
             orientation=Orientation.HORIZONTAL,
         )
-        assert node.id == "sidebar"
-        assert node.type == "sidebar"
+        assert node.id == "drawer"
+        assert node.type == "drawer"
         assert node.label == "Navigation"
         assert node.flex_ratio == 3
         assert node.orientation == "horizontal"
