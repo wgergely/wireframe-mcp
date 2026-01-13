@@ -6,9 +6,9 @@
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-# Base stage: CUDA 12.4.1 Runtime Ubuntu 22.04
+# Base stage: CUDA 12.6.3 Runtime Ubuntu 22.04
 # ----------------------------------------------------------------------------
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS base
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS base
 
 # Set environment variables for non-interactive installs and Python
 ENV DEBIAN_FRONTEND=noninteractive \
