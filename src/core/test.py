@@ -1,8 +1,9 @@
 """Tests for core logging module."""
 
 import logging
-import pytest
 from io import StringIO
+
+import pytest
 
 from .lib import get_logger, setup_logging
 

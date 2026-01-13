@@ -5,14 +5,17 @@ Source: https://zenodo.org/records/8004165
 """
 
 import json
-import zipfile
 from pathlib import Path
 from typing import Iterator
-from urllib.request import urlretrieve
 
 from src.core import get_logger
 from src.corpus.normalizer import hierarchy_to_layout
-from src.corpus.provider.base import BaseProvider, DataType, StandardizedData
+from src.corpus.provider.base import (
+    BaseProvider,
+    DataType,
+    StandardizedData,
+    download_and_extract,
+)
 from src.mid import ComponentType, LayoutNode
 
 logger = get_logger("provider.egfe")
@@ -84,18 +87,18 @@ class Provider(BaseProvider):
             logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
             return
 
-        zip_path = self._dest_dir / "egfe.zip"
-
-        logger.info(f"[{self.name}] Downloading from {EGFE_URL}...")
         try:
-            urlretrieve(EGFE_URL, zip_path)
-            logger.info(f"[{self.name}] Extracting to {self._dest_dir}...")
-            with zipfile.ZipFile(zip_path, "r") as zf:
-                zf.extractall(self._dest_dir)
+            download_and_extract(
+                url=EGFE_URL,
+                dest_dir=self._dest_dir,
+                extract_dir=self._dest_dir,
+                provider_name=self.name,
+                expected_size_mb=50,  # EGFE is ~50MB
+            )
             logger.info(f"[{self.name}] Ready at {self._dest_dir}")
-        except Exception as e:
+        except ConnectionError as e:
             logger.warning(f"[{self.name}] Download failed: {e}")
-            logger.info("  Creating sample data for testing...")
+            logger.info(f"[{self.name}] Creating sample data for testing...")
             self._create_sample_data()
 
     def _create_sample_data(self) -> None:

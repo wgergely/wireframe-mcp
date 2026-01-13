@@ -145,6 +145,11 @@ class Provider(BaseProvider):
         """
         from datasets import load_dataset
 
+        try:
+            from tqdm import tqdm
+        except ImportError:
+            tqdm = None
+
         logger.info(
             f"[{self.name}] Streaming {sample_count} samples from HuggingFace..."
         )
@@ -158,10 +163,21 @@ class Provider(BaseProvider):
         )
 
         output_file = self._dest_dir / "websight_samples.jsonl"
-        count = 0
+
+        # Create iterator with optional progress bar
+        if tqdm:
+            iterator = tqdm(
+                enumerate(dataset),
+                total=sample_count,
+                desc=f"[{self.name}]",
+                unit="samples",
+                ncols=80,
+            )
+        else:
+            iterator = enumerate(dataset)
 
         with open(output_file, "w", encoding="utf-8") as f:
-            for item in dataset:
+            for count, item in iterator:
                 if count >= sample_count:
                     break
 
@@ -172,12 +188,15 @@ class Provider(BaseProvider):
                     "llm_generated_idea": item.get("llm_generated_idea", ""),
                 }
                 f.write(json.dumps(sample) + "\n")
-                count += 1
 
-                if count % 100 == 0:
-                    logger.info(f"[{self.name}] Downloaded {count}/{sample_count}...")
+                # Fallback progress for non-tqdm
+                if not tqdm and (count + 1) % 100 == 0:
+                    logger.info(
+                        f"[{self.name}] Downloaded {count + 1}/{sample_count}..."
+                    )
 
-        logger.info(f"[{self.name}] Downloaded {count} samples to {output_file}")
+        final_count = min(count + 1, sample_count)
+        logger.info(f"[{self.name}] Downloaded {final_count} samples to {output_file}")
 
     def _show_manual_instructions(self) -> None:
         """Show instructions for manual full dataset download."""

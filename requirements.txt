@@ -8,8 +8,9 @@ python-dotenv
 pydantic
 
 # Vector Database & Math
-# Use faiss-cpu for pip install; faiss-gpu available via conda on Linux
-faiss-cpu
+# FAISS GPU: Installed via conda (no Windows pip wheels available)
+# Setup: conda install -c conda-forge faiss-gpu (requires Python 3.12)
+# The venv-win environment is a conda env with faiss-gpu pre-installed
 numpy
 
 # Embedding Backends
@@ -19,3 +20,4 @@ sentence-transformers>=2.2
 # Data Fetching & Datasets
 datasets
 Pillow
+tqdm

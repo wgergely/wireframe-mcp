@@ -45,23 +45,32 @@ class TestRicoProvider(BaseProviderTest):
         assert provider._extract_dir == tmp_path / "rico" / "semantic"
 
     @pytest.mark.unit
-    def test_fetch_calls_urlretrieve(self, tmp_path, monkeypatch):
-        """Fetch method calls download and extracts."""
+    def test_fetch_calls_download_and_extract(self, tmp_path, monkeypatch):
+        """Fetch method calls download utility and extracts."""
 
-        # Mock urlretrieve
+        # Mock download_and_extract
         mock_called = False
+        captured_args = {}
 
-        def mock_urlretrieve(url, filename, reporthook=None):
-            nonlocal mock_called
+        def mock_download_and_extract(
+            url, dest_dir, extract_dir, provider_name, expected_size_mb=None
+        ):
+            nonlocal mock_called, captured_args
             mock_called = True
-            # Create a dummy zip file
-            import zipfile
-
-            with zipfile.ZipFile(filename, "w") as zf:
-                zf.writestr("test.json", "{}")
+            captured_args = {
+                "url": url,
+                "dest_dir": dest_dir,
+                "extract_dir": extract_dir,
+                "provider_name": provider_name,
+                "expected_size_mb": expected_size_mb,
+            }
+            # Create the extract directory and a dummy file
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            (extract_dir / "test.json").write_text("{}")
 
         monkeypatch.setattr(
-            "src.corpus.provider.rico.lib.urlretrieve", mock_urlretrieve
+            "src.corpus.provider.rico.lib.download_and_extract",
+            mock_download_and_extract,
         )
 
         provider = RicoProvider(tmp_path, dataset_type="semantic")
@@ -69,6 +78,8 @@ class TestRicoProvider(BaseProviderTest):
 
         assert mock_called
         assert (tmp_path / "rico" / "semantic").exists()
+        assert captured_args["provider_name"] == "rico_semantic"
+        assert captured_args["expected_size_mb"] == 150  # semantic dataset size
 
     @pytest.mark.unit
     def test_process_yields_data(self, tmp_path):

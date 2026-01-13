@@ -1,15 +1,17 @@
 """Rico dataset provider."""
 
 import json
-import tarfile
-import zipfile
 from pathlib import Path
 from typing import Iterator, Literal
-from urllib.request import urlretrieve
 
 from src.core import get_logger
 from src.corpus.normalizer import normalize_rico_hierarchy
-from src.corpus.provider.base import BaseProvider, DataType, StandardizedData
+from src.corpus.provider.base import (
+    BaseProvider,
+    DataType,
+    StandardizedData,
+    download_and_extract,
+)
 from src.mid import LayoutNode
 
 logger = get_logger("provider.rico")
@@ -114,53 +116,17 @@ class Provider(BaseProvider):
             return
 
         url = self.dataset_info["url"]
+        expected_size_mb = self.dataset_info.get("size_mb")
         self._dest_dir.mkdir(parents=True, exist_ok=True)
 
-        filename = url.split("/")[-1]
-        output_path = self._dest_dir / filename
-
-        logger.info(f"[{self.name}] Downloading from {url}...")
-        self._download_with_progress(url, output_path)
-
-        logger.info(f"[{self.name}] Extracting to {self._extract_dir}...")
-        self._extract_archive(output_path)
+        download_and_extract(
+            url=url,
+            dest_dir=self._dest_dir,
+            extract_dir=self._extract_dir,
+            provider_name=self.name,
+            expected_size_mb=expected_size_mb,
+        )
         logger.info(f"[{self.name}] Dataset ready at {self._extract_dir}")
-
-    def _download_with_progress(self, url: str, output_path: Path) -> None:
-        """Download file with progress reporting.
-
-        Args:
-            url: URL to download from.
-            output_path: Path to save the downloaded file.
-
-        Raises:
-            ConnectionError: If download fails.
-        """
-
-        def progress_hook(block_num: int, block_size: int, total_size: int) -> None:
-            if total_size > 0:
-                percent = min(100, (block_num * block_size / total_size) * 100)
-                logger.debug(f"[{self.name}] Progress: {percent:.1f}%")
-
-        try:
-            urlretrieve(url, output_path, reporthook=progress_hook)
-        except Exception as e:
-            raise ConnectionError(f"[{self.name}] Failed to download: {e}") from e
-
-    def _extract_archive(self, archive_path: Path) -> None:
-        """Extract archive to the extract directory.
-
-        Args:
-            archive_path: Path to the archive file (.tar.gz or .zip).
-        """
-        self._extract_dir.mkdir(parents=True, exist_ok=True)
-
-        if archive_path.name.endswith(".tar.gz"):
-            with tarfile.open(archive_path, "r:gz") as tar:
-                tar.extractall(path=self._extract_dir)
-        elif archive_path.suffix == ".zip":
-            with zipfile.ZipFile(archive_path, "r") as zf:
-                zf.extractall(path=self._extract_dir)
 
     def process(self) -> Iterator[StandardizedData]:
         """Process Rico data and yield standardized items.

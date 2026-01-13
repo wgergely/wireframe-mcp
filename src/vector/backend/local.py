@@ -5,25 +5,15 @@ Provides fallback when Voyage API is unavailable.
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from ..models import DEFAULT_MODEL, get_model_manager
 from .base import EmbeddingBackend
 
 logger = logging.getLogger(__name__)
-
-# Default model for general-purpose embeddings
-DEFAULT_MODEL = "all-MiniLM-L6-v2"
-
-# Model dimensions for common models
-MODEL_DIMENSIONS = {
-    "all-MiniLM-L6-v2": 384,
-    "all-mpnet-base-v2": 768,
-    "paraphrase-MiniLM-L6-v2": 384,
-    "multi-qa-MiniLM-L6-cos-v1": 384,
-    "all-distilroberta-v1": 768,
-}
 
 
 class LocalBackend(EmbeddingBackend):
@@ -44,6 +34,8 @@ class LocalBackend(EmbeddingBackend):
         model_name: str = DEFAULT_MODEL,
         device: str | None = None,
         normalize: bool = True,
+        models_dir: Path | str | None = None,
+        auto_download: bool = True,
     ):
         """Initialize local backend.
 
@@ -51,6 +43,9 @@ class LocalBackend(EmbeddingBackend):
             model_name: sentence-transformers model name.
             device: Device for computation ('cuda', 'cpu', or None for auto).
             normalize: Whether to normalize embeddings for cosine similarity.
+            models_dir: Override path for model storage. Uses centralized
+                .corpus/models directory if not provided.
+            auto_download: Automatically download model if not present.
 
         Raises:
             ImportError: If sentence-transformers not installed.
@@ -58,6 +53,8 @@ class LocalBackend(EmbeddingBackend):
         self._model_name = model_name
         self._device = device
         self._normalize = normalize
+        self._auto_download = auto_download
+        self._model_manager = get_model_manager(models_dir)
         self._model: Any = None
         self._dimension: int | None = None
 
@@ -67,9 +64,10 @@ class LocalBackend(EmbeddingBackend):
         if self._dimension is not None:
             return self._dimension
 
-        # Check known dimensions first
-        if self._model_name in MODEL_DIMENSIONS:
-            return MODEL_DIMENSIONS[self._model_name]
+        # Check known dimensions from registry first
+        dim = self._model_manager.get_dimension(self._model_name)
+        if dim is not None:
+            return dim
 
         # Load model to get dimension
         model = self._get_model()
@@ -84,26 +82,25 @@ class LocalBackend(EmbeddingBackend):
     def _get_model(self) -> Any:
         """Lazily initialize sentence-transformers model.
 
+        Uses the centralized ModelManager for model storage and loading.
+        Models are stored in .corpus/models by default.
+
         Returns:
             Initialized SentenceTransformer instance.
 
         Raises:
             ImportError: If sentence-transformers not installed.
+            FileNotFoundError: If model not found and auto_download=False.
         """
         if self._model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-
-                self._model = SentenceTransformer(self._model_name, device=self._device)
-                logger.info(
-                    f"Loaded model '{self._model_name}' on device "
-                    f"'{self._model.device}'"
-                )
-            except ImportError as e:
-                raise ImportError(
-                    "sentence-transformers required for LocalBackend. "
-                    "Install with: pip install sentence-transformers"
-                ) from e
+            self._model = self._model_manager.load(
+                self._model_name,
+                device=self._device,
+                auto_download=self._auto_download,
+            )
+            logger.info(
+                f"Loaded model '{self._model_name}' on device '{self._model.device}'"
+            )
         return self._model
 
     def embed(self, texts: list[str]) -> np.ndarray:

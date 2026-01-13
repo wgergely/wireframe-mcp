@@ -3,6 +3,7 @@
 # External datasets (not committed)
 data/
 .data/
+.corpus/data/
 
 # tmpclaude
 tmpclaude*

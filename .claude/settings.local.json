@@ -34,7 +34,23 @@
       "Bash(/c/Users/hello/miniconda3/Scripts/conda.exe create:*)",
       "Bash(/y/code/wireframe-mcp-worktrees/conda-win/python.exe -m pip install:*)",
       "Bash(/y/code/wireframe-mcp-worktrees/conda-win/python.exe -c:*)",
-      "Bash(# Find faiss related files in conda env echo \"\"=== FAISS package files ===\"\" ls -la /y/code/wireframe-mcp-worktrees/conda-win/Lib/site-packages/faiss/)"
+      "Bash(# Find faiss related files in conda env echo \"\"=== FAISS package files ===\"\" ls -la /y/code/wireframe-mcp-worktrees/conda-win/Lib/site-packages/faiss/)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/Scripts/pip.exe search:*)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/Scripts/pip.exe index versions faiss-gpu-cu12)",
+      "WebFetch(domain:myuan.fun)",
+      "WebFetch(domain:github.com)",
+      "Bash(/y/code/wireframe-mcp-worktrees/venv-win/python.exe -m pytest -v --tb=short)",
+      "Bash(set:*)",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -m ruff format src/corpus/api/lib.py src/corpus/api/test.py)",
+      "Bash(\"Y:/code/wireframe-mcp-worktrees/venv-win/Scripts/python.exe\" -m ruff check:*)",
+      "Bash(pip show:*)",
+      "Bash(ruff:*)",
+      "Bash(cmd /c \"dir Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\\\\.corpus /s /b\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path ''Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\\\\.corpus'' -Recurse | Select-Object FullName\")",
+      "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" status --short)",
+      "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" diff --cached)",
+      "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" diff)",
+      "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" log --oneline -5)"
     ]
   }
 }

@@ -1,14 +1,17 @@
 """Enrico dataset provider."""
 
 import json
-import zipfile
 from pathlib import Path
 from typing import Iterator
-from urllib.request import urlretrieve
 
 from src.core import get_logger
 from src.corpus.normalizer import normalize_enrico_hierarchy
-from src.corpus.provider.base import BaseProvider, DataType, StandardizedData
+from src.corpus.provider.base import (
+    BaseProvider,
+    DataType,
+    StandardizedData,
+    download_and_extract,
+)
 from src.mid import LayoutNode
 
 logger = get_logger("provider.enrico")
@@ -91,45 +94,27 @@ class Provider(BaseProvider):
             logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
             return
 
-        # Download and extract hierarchies
-        self._download_and_extract(
-            "hierarchies",
-            ENRICO_URLS["hierarchies"],
-            self._hierarchies_dir,
+        # Download and extract hierarchies (~5MB)
+        logger.info(f"[{self.name}] Downloading hierarchies...")
+        download_and_extract(
+            url=ENRICO_URLS["hierarchies"],
+            dest_dir=self._dest_dir,
+            extract_dir=self._hierarchies_dir,
+            provider_name=self.name,
+            expected_size_mb=5,
         )
 
-        # Download and extract screenshots
-        self._download_and_extract(
-            "screenshots",
-            ENRICO_URLS["screenshots"],
-            self._screenshots_dir,
+        # Download and extract screenshots (~200MB)
+        logger.info(f"[{self.name}] Downloading screenshots...")
+        download_and_extract(
+            url=ENRICO_URLS["screenshots"],
+            dest_dir=self._dest_dir,
+            extract_dir=self._screenshots_dir,
+            provider_name=self.name,
+            expected_size_mb=200,
         )
 
         logger.info(f"[{self.name}] Ready at {self._dest_dir}")
-
-    def _download_and_extract(self, name: str, url: str, extract_dir: Path) -> None:
-        """Download and extract a single archive.
-
-        Args:
-            name: Name of the dataset (e.g., 'hierarchies', 'screenshots').
-            url: URL to download from.
-            extract_dir: Directory to extract archive contents into.
-
-        Raises:
-            ConnectionError: If download fails.
-        """
-        zip_path = self._dest_dir / f"{name}.zip"
-
-        logger.info(f"[{self.name}] Downloading {name} from {url}...")
-        try:
-            urlretrieve(url, zip_path)
-        except Exception as e:
-            raise ConnectionError(f"[{self.name}] Download failed: {e}") from e
-
-        logger.info(f"[{self.name}] Extracting {name}...")
-        extract_dir.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(extract_dir)
 
     def process(self) -> Iterator[StandardizedData]:
         """Process Enrico data and yield standardized items.

@@ -97,18 +97,41 @@ class Provider(BaseProvider):
         try:
             from datasets import load_dataset
 
+            try:
+                from tqdm import tqdm
+            except ImportError:
+                tqdm = None
+
             logger.info(f"[{self.name}] Downloading from HuggingFace: {SHOWUI_DATASET}")
             dataset = load_dataset(SHOWUI_DATASET, split="train")
 
             # Save samples as JSON files for offline processing
             self._samples_dir.mkdir(parents=True, exist_ok=True)
 
-            for i, sample in enumerate(dataset):
+            # Create iterator with optional progress bar
+            if tqdm:
+                iterator = tqdm(
+                    enumerate(dataset),
+                    total=len(dataset),
+                    desc=f"[{self.name}]",
+                    unit="samples",
+                    ncols=80,
+                )
+            else:
+                iterator = enumerate(dataset)
+
+            for i, sample in iterator:
                 sample_path = self._samples_dir / f"sample_{i:05d}.json"
                 # Convert to serializable format
                 serializable = self._sample_to_dict(sample)
                 with open(sample_path, "w", encoding="utf-8") as f:
                     json.dump(serializable, f)
+
+                # Fallback progress for non-tqdm
+                if not tqdm and (i + 1) % 100 == 0:
+                    logger.info(
+                        f"[{self.name}] Saved {i + 1}/{len(dataset)} samples..."
+                    )
 
             logger.info(
                 f"[{self.name}] Saved {len(dataset)} samples to {self._samples_dir}"
