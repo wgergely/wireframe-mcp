@@ -112,6 +112,34 @@ Ranked based on **Acquirability** (ease of download), **License** (freedom to us
 
 ---
 
+3.  **Phase 3 (Web)**: Scrape/Download **WebUI** only if Android layouts prove insufficient for the User's needs.
+
+---
+
+## Top 10 Recommended Datasets for Wireframe Broker (React & Desktop Focus)
+
+Ranked by suitability for generating **React Frontends** (Web) and **Python Desktop Interfaces** (PySide/Qt).
+
+| Rank | Dataset | Focus | Scale | Why it Fits |
+| :--- | :--- | :--- | :--- | :--- |
+| **1** | **WebSight** (HuggingFaceM4) | **React/Web** | 2M (Synthetic) | **HTML + Tailwind**. The closest "Figma-to-Code" dataset. Perfect for training models to generate clean, modern React code from visuals. |
+| **2** | **ShowUI-Desktop** | **Desktop** | ~8k | **PC GUI Focus**. Specifically targets desktop applications. Critical for the "PySight/PySide" requirement where mobile datasets (Rico) fail. |
+| **3** | **Rico (Semantic)** | **Layout Logic** | 72k | **Structural Logic**. Even though it's Android, the *graph* of "Container -> Button" is universal. Best for learning general UI composition. |
+| **4** | **Enrico** | **Design** | 1.4k | **Curated Quality**. Good for understanding "Login Screens" vs "Profile Screens" visually. High quality standard. |
+| **5** | **WebUI** (Anthropics) | **Web** | 400k | **Volume**. Massive raw data for web layouts, though requires filtering for "React-like" quality. |
+| **6** | **ScreenSpot** | **Grounding** | 1.2k+ | **Multi-Platform**. Covers macOS/Windows. Excellent for evaluating if the generated layout *makes sense* to a user. |
+| **7** | **Vision2UI** | **Real Web** | 2k+ | **Real-World Code**. Maps real screenshots to HTML code, bridging the gap between "Design" and "Implementation". |
+| **8** | **MUI / AntD Docs** *(Custom)* | **Components** | N/A (Scrape) | **The "React Gold Standard"**. Not a zip file, but scraping the *examples* from Material UI/Ant Design docs provides the highest quality labelled {Image -> Code} pairs. |
+| **9** | **Aria-UI** | **Context** | 7.8k | **Instruction Following**. Good for Agents that need to "Click the Submit button". |
+| **10** | **Simulated PySide** *(Custom)* | **Desktop** | Synthetic | **Required for Desktop Code**. Since large PySide datasets don't exist, using a script to generate random standard Qt Layouts is the recommended path for code-training. |
+
+### Recommendation for "Wireframe Broker"
+*   **React Layer**: Use **WebSight** for visual-to-code mapping. Supplement with a custom scrape of **MUI/Ant Design** docs if high-fidelity code is needed.
+*   **Desktop Layer**: Use **ShowUI-Desktop** for understanding PC layouts.
+*   **Composition Layer**: Keep **Rico** as the backend vector store for abstract layout retrieval (e.g. "Find me a 3-column layout").
+
+---
+
 ## Complexity Metrics
 
 | Metric | Description | Weight |
