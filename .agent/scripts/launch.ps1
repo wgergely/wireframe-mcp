@@ -15,7 +15,7 @@ $WorktreesContainer = (Get-Item "$SelectedWorktree\..").FullName
 # .env is ALWAYS loaded from the main branch
 $MainBranch = Join-Path $WorktreesContainer "main"
 $EnvFile = Join-Path $MainBranch ".env"
-$VenvPath = Join-Path $WorktreesContainer ".venv"
+$VenvPath = Join-Path $WorktreesContainer "venv-win"
 
 # --- Environment Setup ---
 . (Join-Path $PSScriptRoot "_env-setup.ps1") -EnvFile $EnvFile -VenvPath $VenvPath

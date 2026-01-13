@@ -113,12 +113,13 @@ error.log
 # environments
 .env
 .venv
-env/
+.venv-win
 venv/
+venv-win/
+env/
 ENV/
 env.bak/
 venv.bak/
-venv-win/
 
 # mypy
 .mypy_cache/

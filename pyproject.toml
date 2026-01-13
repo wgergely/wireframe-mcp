@@ -31,13 +31,15 @@ exclude = [
     ".svn",
     ".tox",
     ".venv",
+    ".venv-win",
+    "venv",
+    "venv-win",
     "__pypackages__",
     "_build",
     "buck-out",
     "build",
     "dist",
     "node_modules",
-    "venv",
 ]
 
 [tool.ruff.lint]
