@@ -105,11 +105,11 @@ class Provider(BaseProvider):
             )
 
         # Logic depends on dataset type.
-        # For 'semantic', it's a zip containing JSONs (and pngs maybe, structure varies).
+        # For 'semantic', it's a zip containing JSONs (and pngs, structure varies).
         # Assuming the semantic zip extracts a folder which contains the JSONs.
 
         # We need to explore the extracted directory to find the files.
-        # Based on previous knowledge/URL, 'semantic_annotations.zip' likely contains a 'semantic_annotations' folder.
+        # Based on previous knowledge, 'semantic_annotations.zip' likely contains a folder.
 
         # Let's try to walk the directory
         for file_path in self._extract_dir.rglob("*.json"):
