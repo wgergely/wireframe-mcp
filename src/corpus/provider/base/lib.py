@@ -1,12 +1,29 @@
 """Base provider definitions for the Corpus module."""
 
 import abc
+from enum import Enum
 from pathlib import Path
 from typing import Iterator
 
 from pydantic import BaseModel, ConfigDict
 
 from src.mid import LayoutNode
+
+
+class DataType(Enum):
+    """Types of data that providers can supply.
+
+    Attributes:
+        HIERARCHY: Raw JSON view hierarchy/structure data.
+        IMAGE: Screenshot or visual representation.
+        LAYOUT: Normalized LayoutNode tree (derived from hierarchy).
+        TEXT: Extracted text content from UI elements.
+    """
+
+    HIERARCHY = "hierarchy"
+    IMAGE = "image"
+    LAYOUT = "layout"
+    TEXT = "text"
 
 
 class StandardizedData(BaseModel):
@@ -75,4 +92,32 @@ class BaseProvider(abc.ABC):
 
         Yields:
             StandardizedData items from the provider.
+        """
+
+    @abc.abstractmethod
+    def has_data(self, data_type: DataType | None = None) -> bool:
+        """Check if data exists for this provider.
+
+        Args:
+            data_type: Optional filter for specific data type.
+                If None, returns True if any data exists.
+                If specified, returns True only if that data type is available.
+
+        Returns:
+            True if requested data is available, False otherwise.
+        """
+
+    @abc.abstractmethod
+    def to_layout(self, hierarchy: dict, item_id: str) -> LayoutNode:
+        """Convert provider-specific hierarchy to LayoutNode.
+
+        Each provider implements its own conversion logic to transform
+        raw hierarchy data into the standardized LayoutNode format.
+
+        Args:
+            hierarchy: Provider-specific hierarchy dict (Rico, Figma, HTML, etc.)
+            item_id: Unique identifier for generating node IDs.
+
+        Returns:
+            LayoutNode tree representing the semantic UI structure.
         """

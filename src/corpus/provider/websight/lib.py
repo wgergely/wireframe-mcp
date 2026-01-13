@@ -11,14 +11,12 @@ Since the full dataset is 317GB+ with 2M+ samples, this provider supports:
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator
+from typing import Iterator
 
 from src.core import get_logger
 from src.corpus.normalizer import hierarchy_to_layout, normalize_html_to_hierarchy
-from src.corpus.provider.base import BaseProvider, StandardizedData
-
-if TYPE_CHECKING:
-    pass
+from src.corpus.provider.base import BaseProvider, DataType, StandardizedData
+from src.mid import LayoutNode
 
 logger = get_logger("provider.websight")
 
@@ -63,6 +61,45 @@ class Provider(BaseProvider):
     def _dest_dir(self) -> Path:
         """Base directory for WebSight data."""
         return self.data_dir / "websight"
+
+    def has_data(self, data_type: DataType | None = None) -> bool:
+        """Check if data exists for this provider.
+
+        Args:
+            data_type: Optional filter for specific data type.
+
+        Returns:
+            True if requested data is available, False otherwise.
+        """
+        if not self._dest_dir.exists():
+            return False
+
+        parquet_files = list(self._dest_dir.glob("*.parquet"))
+        jsonl_files = list(self._dest_dir.glob("*.jsonl"))
+        json_files = list(self._dest_dir.glob("*.json"))
+        has_data_files = bool(parquet_files or jsonl_files or json_files)
+
+        if data_type is None:
+            return has_data_files
+        elif data_type == DataType.HIERARCHY:
+            return has_data_files  # HTML is the hierarchy source
+        elif data_type == DataType.IMAGE:
+            return False  # WebSight images are in-memory, not files
+        elif data_type in (DataType.LAYOUT, DataType.TEXT):
+            return has_data_files
+        return False
+
+    def to_layout(self, hierarchy: dict, item_id: str) -> "LayoutNode":
+        """Convert HTML hierarchy to LayoutNode.
+
+        Args:
+            hierarchy: Rico-compatible hierarchy dict (converted from HTML).
+            item_id: Unique identifier for generating node IDs.
+
+        Returns:
+            LayoutNode tree representing the semantic UI structure.
+        """
+        return hierarchy_to_layout(hierarchy, id_prefix=f"websight_{item_id}")
 
     def fetch(self, force: bool = False) -> None:
         """Download WebSight data.
@@ -288,7 +325,7 @@ class Provider(BaseProvider):
             hierarchy = normalize_html_to_hierarchy(html)
 
             # Convert hierarchy to LayoutNode
-            layout = hierarchy_to_layout(hierarchy, id_prefix=f"websight_{item_id}")
+            layout = self.to_layout(hierarchy, item_id)
 
             return StandardizedData(
                 id=item_id,

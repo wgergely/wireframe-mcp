@@ -34,16 +34,16 @@ class TestEgfeProvider(BaseProviderTest):
 
     @pytest.mark.unit
     def test_has_data_returns_false_when_empty(self, provider):
-        """Verify _has_data returns False when no JSON files exist."""
+        """Verify has_data returns False when no JSON files exist."""
         provider._dest_dir.mkdir(parents=True, exist_ok=True)
-        assert provider._has_data() is False
+        assert provider.has_data() is False
 
     @pytest.mark.unit
     def test_has_data_returns_true_when_json_exists(self, provider):
-        """Verify _has_data returns True when JSON files exist."""
+        """Verify has_data returns True when JSON files exist."""
         provider._dest_dir.mkdir(parents=True, exist_ok=True)
         (provider._dest_dir / "test.json").write_text("{}")
-        assert provider._has_data() is True
+        assert provider.has_data() is True
 
     @pytest.mark.unit
     def test_process_yields_standardized_data(self, provider):

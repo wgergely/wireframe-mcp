@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Iterator
 
 from src.core import get_logger
-from src.corpus.provider.base import BaseProvider, StandardizedData
+from src.corpus.provider.base import BaseProvider, DataType, StandardizedData
 from src.mid import ComponentType, LayoutNode
 
 logger = get_logger("provider.showui")
@@ -16,69 +16,6 @@ DEFAULT_SCREEN_HEIGHT = 1080
 
 # ShowUI Desktop dataset on HuggingFace
 SHOWUI_DATASET = "Voxel51/ShowUI_desktop"
-
-
-def _showui_hierarchy_to_layout(
-    hierarchy: dict,
-    id_prefix: str = "showui",
-    screen_width: int = DEFAULT_SCREEN_WIDTH,
-    screen_height: int = DEFAULT_SCREEN_HEIGHT,
-) -> LayoutNode:
-    """Convert ShowUI pseudo-hierarchy to LayoutNode.
-
-    ShowUI uses normalized coordinates [x, y, w, h] in 0-1 range.
-    We convert these to flex ratios for the LayoutNode structure.
-
-    Args:
-        hierarchy: ShowUI pseudo-hierarchy dict.
-        id_prefix: Prefix for node IDs.
-        screen_width: Screen width for flex calculation.
-        screen_height: Screen height for flex calculation.
-
-    Returns:
-        Root LayoutNode with children.
-    """
-    children = []
-
-    for i, child in enumerate(hierarchy.get("children", [])):
-        # Calculate flex ratio from normalized width (0-1 → 1-12)
-        bbox = child.get("bounds", [0, 0, 0.1, 0.1])
-        if len(bbox) >= 4:
-            width_ratio = bbox[2]  # Normalized width (0-1)
-            flex_ratio = max(1, min(12, round(width_ratio * 12)))
-        else:
-            flex_ratio = 1
-
-        # Infer component type from label
-        label_text = child.get("label", "action").lower()
-        if "button" in label_text or "click" in label_text:
-            comp_type = ComponentType.BUTTON
-        elif "text" in label_text or "input" in label_text:
-            comp_type = ComponentType.INPUT
-        elif "icon" in label_text:
-            comp_type = ComponentType.ICON
-        elif "image" in label_text:
-            comp_type = ComponentType.IMAGE
-        else:
-            comp_type = ComponentType.CONTAINER
-
-        child_node = LayoutNode(
-            id=f"{id_prefix}_{i}",
-            type=comp_type,
-            label=child.get("text") or None,
-            flex_ratio=flex_ratio,
-            children=[],
-        )
-        children.append(child_node)
-
-    # Create root node
-    return LayoutNode(
-        id=f"{id_prefix}_root",
-        type=ComponentType.CONTAINER,
-        label=hierarchy.get("text") or None,
-        flex_ratio=12,
-        children=children,
-    )
 
 
 class Provider(BaseProvider):
@@ -104,12 +41,44 @@ class Provider(BaseProvider):
         """Directory containing processed samples."""
         return self._dest_dir / "samples"
 
-    def _has_data(self) -> bool:
-        """Check if data exists (JSON samples or HuggingFace cache)."""
-        if self._samples_dir.exists():
-            json_files = list(self._samples_dir.glob("*.json"))
-            return len(json_files) > 0
+    def has_data(self, data_type: DataType | None = None) -> bool:
+        """Check if data exists (JSON samples or HuggingFace cache).
+
+        Args:
+            data_type: Optional filter for specific data type.
+
+        Returns:
+            True if requested data is available, False otherwise.
+        """
+        if not self._samples_dir.exists():
+            return False
+
+        json_files = list(self._samples_dir.glob("*.json"))
+        has_json = len(json_files) > 0
+
+        if data_type is None:
+            return has_json
+        elif data_type == DataType.HIERARCHY:
+            return has_json
+        elif data_type == DataType.IMAGE:
+            return False  # ShowUI samples don't include screenshot files
+        elif data_type in (DataType.LAYOUT, DataType.TEXT):
+            return has_json
         return False
+
+    def to_layout(self, hierarchy: dict, item_id: str) -> LayoutNode:
+        """Convert provider-specific hierarchy to LayoutNode.
+
+        Args:
+            hierarchy: ShowUI pseudo-hierarchy dict.
+            item_id: Unique identifier for generating node IDs.
+
+        Returns:
+            LayoutNode tree representing the semantic UI structure.
+        """
+        return self._showui_hierarchy_to_layout(
+            hierarchy, id_prefix=f"showui_{item_id}"
+        )
 
     def fetch(self, force: bool = False) -> None:
         """Download ShowUI Desktop dataset.
@@ -123,7 +92,7 @@ class Provider(BaseProvider):
         """
         self._dest_dir.mkdir(parents=True, exist_ok=True)
 
-        if self._has_data() and not force:
+        if self.has_data() and not force:
             logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
             return
 
@@ -260,13 +229,76 @@ class Provider(BaseProvider):
         Yields:
             StandardizedData items from the ShowUI dataset.
         """
-        if not self._has_data():
+        if not self.has_data():
             raise FileNotFoundError(f"[{self.name}] Run fetch() first.")
 
         for json_path in sorted(self._samples_dir.glob("*.json")):
             item = self._process_json_file(json_path)
             if item:
                 yield item
+
+    def _showui_hierarchy_to_layout(
+        self,
+        hierarchy: dict,
+        id_prefix: str = "showui",
+        screen_width: int = DEFAULT_SCREEN_WIDTH,
+        screen_height: int = DEFAULT_SCREEN_HEIGHT,
+    ) -> LayoutNode:
+        """Convert ShowUI pseudo-hierarchy to LayoutNode.
+
+        ShowUI uses normalized coordinates [x, y, w, h] in 0-1 range.
+        Convert these to flex ratios for the LayoutNode structure.
+
+        Args:
+            hierarchy: ShowUI pseudo-hierarchy dict.
+            id_prefix: Prefix for node IDs.
+            screen_width: Screen width for flex calculation.
+            screen_height: Screen height for flex calculation.
+
+        Returns:
+            Root LayoutNode with children.
+        """
+        children = []
+
+        for i, child in enumerate(hierarchy.get("children", [])):
+            # Calculate flex ratio from normalized width (0-1 → 1-12)
+            bbox = child.get("bounds", [0, 0, 0.1, 0.1])
+            if len(bbox) >= 4:
+                width_ratio = bbox[2]  # Normalized width (0-1)
+                flex_ratio = max(1, min(12, round(width_ratio * 12)))
+            else:
+                flex_ratio = 1
+
+            # Infer component type from label
+            label_text = child.get("label", "action").lower()
+            if "button" in label_text or "click" in label_text:
+                comp_type = ComponentType.BUTTON
+            elif "text" in label_text or "input" in label_text:
+                comp_type = ComponentType.INPUT
+            elif "icon" in label_text:
+                comp_type = ComponentType.ICON
+            elif "image" in label_text:
+                comp_type = ComponentType.IMAGE
+            else:
+                comp_type = ComponentType.CONTAINER
+
+            child_node = LayoutNode(
+                id=f"{id_prefix}_{i}",
+                type=comp_type,
+                label=child.get("text") or None,
+                flex_ratio=flex_ratio,
+                children=[],
+            )
+            children.append(child_node)
+
+        # Create root node
+        return LayoutNode(
+            id=f"{id_prefix}_root",
+            type=ComponentType.CONTAINER,
+            label=hierarchy.get("text") or None,
+            flex_ratio=12,
+            children=children,
+        )
 
     def _process_json_file(self, json_path: Path) -> StandardizedData | None:
         """Process a single JSON sample and return StandardizedData.
@@ -286,7 +318,7 @@ class Provider(BaseProvider):
             item_id = json_path.stem
 
             # Convert to LayoutNode
-            layout = _showui_hierarchy_to_layout(
+            layout = self._showui_hierarchy_to_layout(
                 hierarchy, id_prefix=f"showui_{item_id}"
             )
 

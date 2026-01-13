@@ -11,11 +11,21 @@ class MockProvider(BaseProvider):
     def name(self):
         return "mock_provider"
 
+    def has_data(self) -> bool:
+        """Check if data exists."""
+        return False
+
     def fetch(self, force=False):
         pass
 
     def process(self):
         yield from []
+
+    def to_layout(self, hierarchy: dict, item_id: str):
+        """Mock implementation - not used in these tests."""
+        from src.mid import ComponentType, LayoutNode
+
+        return LayoutNode(id=item_id, type=ComponentType.CONTAINER)
 
 
 class TestCorpusManager:

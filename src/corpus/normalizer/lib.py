@@ -4,7 +4,6 @@ Converts raw UI hierarchy data from various providers (Rico, Enrico, etc.)
 into standardized LayoutNode representations for the MID layer.
 """
 
-
 from src.mid import ComponentType, LayoutNode, Orientation
 
 # Rico/Enrico componentLabel → ComponentType mapping

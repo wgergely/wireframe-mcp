@@ -6,7 +6,6 @@ import pytest
 
 from src.corpus.provider.base.test import BaseProviderTest
 from src.corpus.provider.showui import Provider
-from src.corpus.provider.showui.lib import _showui_hierarchy_to_layout
 from src.mid import LayoutNode, is_valid
 
 
@@ -36,14 +35,14 @@ class TestShowUIProvider(BaseProviderTest):
     def test_has_data_returns_false_when_empty(self, provider):
         """Verify _has_data returns False when no JSON files exist."""
         provider._samples_dir.mkdir(parents=True, exist_ok=True)
-        assert provider._has_data() is False
+        assert provider.has_data() is False
 
     @pytest.mark.unit
     def test_has_data_returns_true_when_json_exists(self, provider):
         """Verify _has_data returns True when JSON samples exist."""
         provider._samples_dir.mkdir(parents=True, exist_ok=True)
         (provider._samples_dir / "sample_00000.json").write_text("{}")
-        assert provider._has_data() is True
+        assert provider.has_data() is True
 
     @pytest.mark.unit
     def test_detection_to_hierarchy(self, provider):
@@ -168,8 +167,13 @@ class TestShowUIProvider(BaseProviderTest):
 class TestShowUIHierarchyToLayout:
     """Tests for ShowUI hierarchy to layout conversion."""
 
+    @pytest.fixture
+    def provider(self, tmp_path):
+        """Create a provider instance for testing."""
+        return Provider(tmp_path)
+
     @pytest.mark.unit
-    def test_converts_normalized_width_to_flex_ratio(self):
+    def test_converts_normalized_width_to_flex_ratio(self, provider):
         """Verify normalized width [x, y, w, h] is converted to flex ratio."""
         hierarchy = {
             "type": "screen",
@@ -184,23 +188,23 @@ class TestShowUIHierarchyToLayout:
             ],
         }
 
-        layout = _showui_hierarchy_to_layout(hierarchy)
+        layout = provider._showui_hierarchy_to_layout(hierarchy)
 
         child = layout.children[0]
         # width_ratio=0.5 → flex_ratio = round(0.5 * 12) = 6
         assert child.flex_ratio == 6
 
     @pytest.mark.unit
-    def test_root_has_full_flex_ratio(self):
+    def test_root_has_full_flex_ratio(self, provider):
         """Verify root node has full flex ratio (12)."""
         hierarchy = {"type": "screen", "children": []}
 
-        layout = _showui_hierarchy_to_layout(hierarchy)
+        layout = provider._showui_hierarchy_to_layout(hierarchy)
 
         assert layout.flex_ratio == 12
 
     @pytest.mark.unit
-    def test_infers_button_from_label(self):
+    def test_infers_button_from_label(self, provider):
         """Verify button label maps to BUTTON component type."""
         hierarchy = {
             "children": [
@@ -209,24 +213,24 @@ class TestShowUIHierarchyToLayout:
             ]
         }
 
-        layout = _showui_hierarchy_to_layout(hierarchy)
+        layout = provider._showui_hierarchy_to_layout(hierarchy)
 
         # LayoutNode stores string values due to use_enum_values=True
         assert layout.children[0].type == "button"
         assert layout.children[1].type == "button"
 
     @pytest.mark.unit
-    def test_empty_hierarchy(self):
+    def test_empty_hierarchy(self, provider):
         """Verify empty hierarchy produces valid layout."""
         hierarchy = {"type": "screen", "children": []}
 
-        layout = _showui_hierarchy_to_layout(hierarchy)
+        layout = provider._showui_hierarchy_to_layout(hierarchy)
 
         assert is_valid(layout)
         assert len(layout.children) == 0
 
     @pytest.mark.unit
-    def test_preserves_text_from_hierarchy(self):
+    def test_preserves_text_from_hierarchy(self, provider):
         """Verify text is preserved in layout nodes as label."""
         hierarchy = {
             "type": "screen",
@@ -240,7 +244,7 @@ class TestShowUIHierarchyToLayout:
             ],
         }
 
-        layout = _showui_hierarchy_to_layout(hierarchy)
+        layout = provider._showui_hierarchy_to_layout(hierarchy)
 
         assert layout.label == "Main instruction"
         assert layout.children[0].label == "Element text"

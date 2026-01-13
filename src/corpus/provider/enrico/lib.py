@@ -8,7 +8,8 @@ from urllib.request import urlretrieve
 
 from src.core import get_logger
 from src.corpus.normalizer import normalize_enrico_hierarchy
-from src.corpus.provider.base import BaseProvider, StandardizedData
+from src.corpus.provider.base import BaseProvider, DataType, StandardizedData
+from src.mid import LayoutNode
 
 logger = get_logger("provider.enrico")
 
@@ -42,13 +43,39 @@ class Provider(BaseProvider):
         """Directory containing screenshot JPG files."""
         return self._dest_dir / "screenshots"
 
-    def _has_data(self) -> bool:
+    def has_data(self, data_type: DataType | None = None) -> bool:
         """Check if data exists.
 
+        Args:
+            data_type: Optional filter for specific data type.
+
         Returns:
-            True if both hierarchies and screenshots directories exist, False otherwise.
+            True if requested data is available, False otherwise.
         """
-        return self._hierarchies_dir.exists() and self._screenshots_dir.exists()
+        has_hier = self._hierarchies_dir.exists()
+        has_img = self._screenshots_dir.exists()
+
+        if data_type is None:
+            return has_hier and has_img
+        elif data_type == DataType.HIERARCHY:
+            return has_hier and len(list(self._hierarchies_dir.rglob("*.json"))) > 0
+        elif data_type == DataType.IMAGE:
+            return has_img and len(list(self._screenshots_dir.rglob("*.jpg"))) > 0
+        elif data_type in (DataType.LAYOUT, DataType.TEXT):
+            return self.has_data(DataType.HIERARCHY)
+        return False
+
+    def to_layout(self, hierarchy: dict, item_id: str) -> "LayoutNode":
+        """Convert Enrico hierarchy to LayoutNode.
+
+        Args:
+            hierarchy: Enrico view hierarchy dict.
+            item_id: Unique identifier for generating node IDs.
+
+        Returns:
+            LayoutNode tree representing the semantic UI structure.
+        """
+        return normalize_enrico_hierarchy(hierarchy, item_id)
 
     def fetch(self, force: bool = False) -> None:
         """Download and extract Enrico dataset (hierarchies + screenshots).
@@ -59,7 +86,7 @@ class Provider(BaseProvider):
         self._dest_dir.mkdir(parents=True, exist_ok=True)
 
         # Check if already downloaded
-        if self._has_data() and not force:
+        if self.has_data() and not force:
             logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
             return
 
@@ -112,7 +139,7 @@ class Provider(BaseProvider):
         Raises:
             FileNotFoundError: If dataset directory does not exist.
         """
-        if not self._has_data():
+        if not self.has_data():
             raise FileNotFoundError(f"[{self.name}] Run fetch() first.")
 
         # Build screenshot lookup once for efficiency
@@ -143,7 +170,7 @@ class Provider(BaseProvider):
             item_id = json_path.stem
 
             # Normalize hierarchy to LayoutNode
-            layout = normalize_enrico_hierarchy(data, item_id)
+            layout = self.to_layout(data, item_id)
 
             return StandardizedData(
                 id=item_id,

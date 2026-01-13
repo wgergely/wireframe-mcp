@@ -1,127 +1,47 @@
 """Metadata-Intermediate-Definition (MID) layer.
 
 The MID layer is the **Source of Truth** for the project's semantic layout notation.
-It defines the core vocabulary (ComponentType), structural model (LayoutNode),
-and validation rules that govern all UI representations within the system.
+It defines the structural model (LayoutNode) and validation rules that govern all
+UI representations within the system.
 
 This module acts as the "Contract" shared between the LLM generator,
 the internal validation engine, and the transpilation layers.
+
+Note: Component type definitions and schema generation are delegated to the
+authoritative schema module (src/schema). This module re-exports those types
+for backward compatibility.
 """
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-
-class Orientation(str, Enum):
-    """Defines the flow direction of a container.
-
-    Maps to CSS flex-direction concepts:
-    - HORIZONTAL: Children flow left-to-right (flex-row)
-    - VERTICAL: Children flow top-to-bottom (flex-col)
-    - OVERLAY: Children stack on z-axis (absolute positioning)
-    """
-
-    HORIZONTAL = "horizontal"
-    VERTICAL = "vertical"
-    OVERLAY = "overlay"
-
-
-class ComponentType(str, Enum):
-    """Rico-based UI component taxonomy (26 categories).
-
-    These categories are derived from Rico dataset semantic annotations,
-    providing a standardized vocabulary for UI components.
-    """
-
-    # Containers
-    CONTAINER = "container"
-    CARD = "card"
-    MODAL = "modal"
-    WEB_VIEW = "web_view"
-
-    # Navigation
-    TOOLBAR = "toolbar"
-    NAVBAR = "navbar"
-    BOTTOM_NAV = "bottom_nav"
-    DRAWER = "drawer"
-    TAB_BAR = "tab_bar"
-    MULTI_TAB = "multi_tab"
-    PAGER_INDICATOR = "pager_indicator"
-
-    # Content
-    TEXT = "text"
-    IMAGE = "image"
-    LIST_ITEM = "list_item"
-    ICON = "icon"
-    ADVERTISEMENT = "advertisement"
-
-    # Controls
-    BUTTON = "button"
-    TEXT_BUTTON = "text_button"
-    INPUT = "input"
-    CHECKBOX = "checkbox"
-    RADIO_BUTTON = "radio_button"
-    SWITCH = "switch"
-    SLIDER = "slider"
-    SPINNER = "spinner"
-    DATE_PICKER = "date_picker"
-    NUMBER_STEPPER = "number_stepper"
-
-
-class ComponentCategory(str, Enum):
-    """High-level component groupings for filtering and analysis."""
-
-    CONTAINER = "container"
-    NAVIGATION = "navigation"
-    CONTENT = "content"
-    CONTROL = "control"
-
-
-# Mapping from ComponentType to its category
-COMPONENT_CATEGORIES: dict[ComponentType, ComponentCategory] = {
-    # Containers
-    ComponentType.CONTAINER: ComponentCategory.CONTAINER,
-    ComponentType.CARD: ComponentCategory.CONTAINER,
-    ComponentType.MODAL: ComponentCategory.CONTAINER,
-    ComponentType.WEB_VIEW: ComponentCategory.CONTAINER,
-    # Navigation
-    ComponentType.TOOLBAR: ComponentCategory.NAVIGATION,
-    ComponentType.NAVBAR: ComponentCategory.NAVIGATION,
-    ComponentType.BOTTOM_NAV: ComponentCategory.NAVIGATION,
-    ComponentType.DRAWER: ComponentCategory.NAVIGATION,
-    ComponentType.TAB_BAR: ComponentCategory.NAVIGATION,
-    ComponentType.MULTI_TAB: ComponentCategory.NAVIGATION,
-    ComponentType.PAGER_INDICATOR: ComponentCategory.NAVIGATION,
-    # Content
-    ComponentType.TEXT: ComponentCategory.CONTENT,
-    ComponentType.IMAGE: ComponentCategory.CONTENT,
-    ComponentType.LIST_ITEM: ComponentCategory.CONTENT,
-    ComponentType.ICON: ComponentCategory.CONTENT,
-    ComponentType.ADVERTISEMENT: ComponentCategory.CONTENT,
-    # Controls
-    ComponentType.BUTTON: ComponentCategory.CONTROL,
-    ComponentType.TEXT_BUTTON: ComponentCategory.CONTROL,
-    ComponentType.INPUT: ComponentCategory.CONTROL,
-    ComponentType.CHECKBOX: ComponentCategory.CONTROL,
-    ComponentType.RADIO_BUTTON: ComponentCategory.CONTROL,
-    ComponentType.SWITCH: ComponentCategory.CONTROL,
-    ComponentType.SLIDER: ComponentCategory.CONTROL,
-    ComponentType.SPINNER: ComponentCategory.CONTROL,
-    ComponentType.DATE_PICKER: ComponentCategory.CONTROL,
-    ComponentType.NUMBER_STEPPER: ComponentCategory.CONTROL,
-}
-
-
-def get_component_category(component_type: ComponentType) -> ComponentCategory:
-    """Get the category for a component type."""
-    return COMPONENT_CATEGORIES[component_type]
+# Import authoritative definitions from schema module
+from src.schema import (
+    COMPONENT_REGISTRY,
+    ComponentCategory,
+    ComponentType,
+    Orientation,
+    export_json_schema,
+    get_component_category,
+)
 
 
 class LayoutNode(BaseModel):
-    """Recursive node definition for the UI AST."""
+    """Recursive node definition for the UI AST.
+
+    Represents a single node in the layout tree, with support for
+    nested children to form hierarchical UI structures.
+
+    Attributes:
+        id: Unique identifier for the node within the tree.
+        type: Component type from the 26-category Rico taxonomy.
+        label: Optional human-readable text content.
+        flex_ratio: Grid span ratio (1-12) for relative sizing.
+        children: Nested child nodes for hierarchical layouts.
+        orientation: Layout flow direction for immediate children.
+    """
 
     id: str = Field(..., description="Unique identifier for the node")
     type: ComponentType = Field(
@@ -146,9 +66,21 @@ class LayoutNode(BaseModel):
     }
 
 
+# Re-export COMPONENT_CATEGORIES for backward compatibility
+COMPONENT_CATEGORIES: dict[ComponentType, ComponentCategory] = {
+    ct: COMPONENT_REGISTRY[ct].category for ct in ComponentType
+}
+
+
 @dataclass
 class ValidationError:
-    """Represents a validation error in a layout tree."""
+    """Represents a validation error in a layout tree.
+
+    Attributes:
+        node_id: ID of the node where the error occurred.
+        message: Human-readable error description.
+        error_type: Machine-readable error classification.
+    """
 
     node_id: str
     message: str
@@ -156,7 +88,19 @@ class ValidationError:
 
 
 def validate_layout(node: LayoutNode) -> list[ValidationError]:
-    """Validate a LayoutNode tree for structural issues."""
+    """Validate a LayoutNode tree for structural issues.
+
+    Checks for:
+    - Duplicate IDs within the tree
+    - Cycles (nodes referencing ancestors)
+    - flex_ratio values outside valid range 1-12
+
+    Args:
+        node: Root node of the layout tree to validate.
+
+    Returns:
+        List of ValidationError objects. Empty list if valid.
+    """
     errors: list[ValidationError] = []
 
     # Track IDs, visited nodes, and path for cycle detection
@@ -215,24 +159,28 @@ def validate_layout(node: LayoutNode) -> list[ValidationError]:
 
 
 def is_valid(node: LayoutNode) -> bool:
-    """Check if a layout tree is valid."""
+    """Check if a layout tree is valid.
+
+    Args:
+        node: Root node of the layout tree.
+
+    Returns:
+        True if valid, False if any validation errors exist.
+    """
     return not validate_layout(node)
 
 
-def export_json_schema() -> dict:
-    """Export the LayoutNode JSON Schema for LLM prompt injection."""
-    return LayoutNode.model_json_schema()
-
-
 __all__ = [
+    # Re-exported from schema (for backward compatibility)
     "Orientation",
     "ComponentType",
     "ComponentCategory",
     "COMPONENT_CATEGORIES",
     "get_component_category",
+    "export_json_schema",
+    # MID-specific
     "LayoutNode",
     "ValidationError",
     "validate_layout",
     "is_valid",
-    "export_json_schema",
-]  # Removed: _collect_ids, _validate_flex_ratios, _detect_cycles (consolidated into validate_layout)
+]

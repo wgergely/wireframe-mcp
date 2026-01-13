@@ -12,8 +12,8 @@ from urllib.request import urlretrieve
 
 from src.core import get_logger
 from src.corpus.normalizer import hierarchy_to_layout
-from src.corpus.provider.base import BaseProvider, StandardizedData
-from src.mid import ComponentType
+from src.corpus.provider.base import BaseProvider, DataType, StandardizedData
+from src.mid import ComponentType, LayoutNode
 
 logger = get_logger("provider.egfe")
 
@@ -32,68 +32,16 @@ FIGMA_TYPE_MAP: dict[str, ComponentType] = {
     "ELLIPSE": ComponentType.ICON,
 }
 
-
-def _infer_component_from_figma(node: dict) -> str:
-    """Infer componentLabel from Figma node properties."""
-    node_type = node.get("type", "FRAME")
-    name = node.get("name", "").lower()
-
-    # Check name patterns for common UI elements
-    if "button" in name or "btn" in name:
-        return "Text Button"
-    if "input" in name or "field" in name:
-        return "Input"
-    if "icon" in name:
-        return "Icon"
-    if "image" in name or "img" in name:
-        return "Image"
-    if "card" in name:
-        return "Card"
-    if "nav" in name or "menu" in name or "header" in name:
-        return "Toolbar"
-    if "modal" in name or "dialog" in name:
-        return "Modal"
-
-    # Fall back to type mapping
-    comp_type = FIGMA_TYPE_MAP.get(node_type, ComponentType.CONTAINER)
-    return {
-        ComponentType.CONTAINER: "Container",
-        ComponentType.CARD: "Card",
-        ComponentType.TEXT: "Text",
-        ComponentType.ICON: "Icon",
-    }.get(comp_type, "Container")
-
-
-def _figma_to_hierarchy(node: dict) -> dict:
-    """Convert Figma JSON node to Rico-compatible hierarchy format."""
-    result = {
-        "class": f"figma.{node.get('type', 'FRAME')}",
-        "componentLabel": _infer_component_from_figma(node),
-        "children": [],
-    }
-
-    # Extract bounds from absoluteBoundingBox or bounds
-    bbox = node.get("absoluteBoundingBox") or node.get("bounds", {})
-    if bbox:
-        x = int(bbox.get("x", 0))
-        y = int(bbox.get("y", 0))
-        w = int(bbox.get("width", 0))
-        h = int(bbox.get("height", 0))
-        result["bounds"] = [x, y, x + w, y + h]
-
-    # Extract text content
-    if node.get("type") == "TEXT":
-        result["text"] = node.get("characters", node.get("name", ""))
-    elif "name" in node:
-        name = node["name"]
-        if not name.startswith("Frame") and not name.startswith("Group"):
-            result["text"] = name
-
-    # Process children
-    for child in node.get("children", []):
-        result["children"].append(_figma_to_hierarchy(child))
-
-    return result
+# Component name patterns for inference
+COMPONENT_NAME_PATTERNS = {
+    ("button", "btn"): "Text Button",
+    ("input", "field"): "Input",
+    ("icon",): "Icon",
+    ("image", "img"): "Image",
+    ("card",): "Card",
+    ("nav", "menu", "header"): "Toolbar",
+    ("modal", "dialog"): "Modal",
+}
 
 
 class Provider(BaseProvider):
@@ -132,7 +80,7 @@ class Provider(BaseProvider):
         self._dest_dir.mkdir(parents=True, exist_ok=True)
 
         # Check if already downloaded
-        if self._has_data() and not force:
+        if self.has_data() and not force:
             logger.info(f"[{self.name}] Dataset already exists at {self._dest_dir}")
             return
 
@@ -238,11 +186,178 @@ class Provider(BaseProvider):
             json.dump(sample, f, indent=2)
         logger.info(f"[{self.name}] Created sample data")
 
-    def _has_data(self) -> bool:
-        """Check if data exists (either flat structure or subdirs)."""
-        # Check for JSON files in any structure
+    def _infer_component_from_figma(self, node: dict) -> str:
+        """Infer component label from Figma node properties.
+
+        Args:
+            node: Figma node dictionary.
+
+        Returns:
+            Component label string.
+        """
+        name = node.get("name", "").lower()
+        node_type = node.get("type", "FRAME")
+
+        # Check name patterns for common UI elements
+        for patterns, label in COMPONENT_NAME_PATTERNS.items():
+            if any(pattern in name for pattern in patterns):
+                return label
+
+        # Fall back to type mapping
+        comp_type = FIGMA_TYPE_MAP.get(node_type, ComponentType.CONTAINER)
+        return {
+            ComponentType.CONTAINER: "Container",
+            ComponentType.CARD: "Card",
+            ComponentType.TEXT: "Text",
+            ComponentType.ICON: "Icon",
+        }.get(comp_type, "Container")
+
+    def _sketch_to_hierarchy(self, data: dict) -> dict:
+        """Convert Sketch export format to Rico-compatible hierarchy.
+
+        Sketch format has flat `layers` array with layer objects.
+
+        Args:
+            data: Sketch export data.
+
+        Returns:
+            Rico-compatible hierarchy dict.
+        """
+        width = data.get("width", 375)
+        height = data.get("height", 812)
+
+        result = {
+            "class": "sketch.canvas",
+            "componentLabel": "Container",
+            "bounds": [0, 0, width, height],
+            "children": [],
+        }
+
+        for layer in data.get("layers", []):
+            rect = layer.get("rect", {})
+            x = int(rect.get("x", 0))
+            y = int(rect.get("y", 0))
+            w = int(rect.get("width", 0))
+            h = int(rect.get("height", 0))
+
+            sketch_class = layer.get("_class", "rectangle")
+            name = layer.get("name", "").lower()
+
+            # Infer component type from class and name
+            if "text" in sketch_class.lower() or "text" in name:
+                comp_label = "Text"
+            elif "button" in name or "btn" in name:
+                comp_label = "Text Button"
+            elif "icon" in name or sketch_class in ("symbolInstance", "symbol"):
+                comp_label = "Icon"
+            elif "image" in name or sketch_class == "bitmap":
+                comp_label = "Image"
+            elif "input" in name or "field" in name:
+                comp_label = "Input"
+            elif sketch_class == "oval":
+                comp_label = "Icon"
+            else:
+                comp_label = "Container"
+
+            child = {
+                "class": f"sketch.{sketch_class}",
+                "componentLabel": comp_label,
+                "bounds": [x, y, x + w, y + h],
+                "children": [],
+            }
+
+            if name and not name.startswith(("rectangle", "oval", "group")):
+                child["text"] = name
+
+            result["children"].append(child)
+
+        return result
+
+    def _figma_to_hierarchy(self, node: dict) -> dict:
+        """Convert Figma/Sketch JSON to Rico-compatible hierarchy.
+
+        Handles two formats:
+        1. Sketch export: flat `layers` array
+        2. Figma export: nested `children` structure
+
+        Args:
+            node: Figma or Sketch node dict.
+
+        Returns:
+            Rico-compatible hierarchy dict.
+        """
+        # Detect Sketch format (flat layers array)
+        if "layers" in node and isinstance(node.get("layers"), list):
+            return self._sketch_to_hierarchy(node)
+
+        # Handle Figma format (nested children)
+        result = {
+            "class": f"figma.{node.get('type', 'FRAME')}",
+            "componentLabel": self._infer_component_from_figma(node),
+            "children": [],
+        }
+
+        # Extract bounds from absoluteBoundingBox or bounds
+        bbox = node.get("absoluteBoundingBox") or node.get("bounds", {})
+        if bbox:
+            x = int(bbox.get("x", 0))
+            y = int(bbox.get("y", 0))
+            w = int(bbox.get("width", 0))
+            h = int(bbox.get("height", 0))
+            result["bounds"] = [x, y, x + w, y + h]
+
+        # Extract text content
+        if node.get("type") == "TEXT":
+            result["text"] = node.get("characters", node.get("name", ""))
+        elif "name" in node:
+            name = node["name"]
+            if not name.startswith("Frame") and not name.startswith("Group"):
+                result["text"] = name
+
+        # Process children
+        for child in node.get("children", []):
+            result["children"].append(self._figma_to_hierarchy(child))
+
+        return result
+
+    def has_data(self, data_type: DataType | None = None) -> bool:
+        """Check if data exists (either flat structure or subdirs).
+
+        Args:
+            data_type: Optional filter for specific data type.
+
+        Returns:
+            True if requested data is available, False otherwise.
+        """
+        if not self._dest_dir.exists():
+            return False
+
         json_files = list(self._dest_dir.rglob("*.json"))
-        return len(json_files) > 0
+        png_files = list(self._dest_dir.rglob("*.png"))
+        has_json = len(json_files) > 0
+        has_png = len(png_files) > 0
+
+        if data_type is None:
+            return has_json
+        elif data_type == DataType.HIERARCHY:
+            return has_json
+        elif data_type == DataType.IMAGE:
+            return has_png
+        elif data_type in (DataType.LAYOUT, DataType.TEXT):
+            return has_json
+        return False
+
+    def to_layout(self, hierarchy: dict, item_id: str) -> LayoutNode:
+        """Convert provider-specific hierarchy to LayoutNode.
+
+        Args:
+            hierarchy: EGFE hierarchy dict.
+            item_id: Unique identifier for generating node IDs.
+
+        Returns:
+            LayoutNode tree representing the semantic UI structure.
+        """
+        return hierarchy_to_layout(hierarchy, id_prefix=f"egfe_{item_id}")
 
     def process(self) -> Iterator[StandardizedData]:
         """Process EGFE data and yield standardized items.
@@ -250,7 +365,7 @@ class Provider(BaseProvider):
         Yields:
             StandardizedData items from the EGFE dataset.
         """
-        if not self._has_data():
+        if not self.has_data():
             raise FileNotFoundError(f"[{self.name}] Run fetch() first.")
 
         # Build screenshot lookup (handle both flat and nested structures)
@@ -284,7 +399,7 @@ class Provider(BaseProvider):
                 data = json.load(f)
 
             # Convert Figma format to Rico-compatible hierarchy
-            hierarchy = _figma_to_hierarchy(data)
+            hierarchy = self._figma_to_hierarchy(data)
 
             # Convert to LayoutNode
             item_id = json_path.stem

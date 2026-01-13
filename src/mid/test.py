@@ -158,5 +158,5 @@ class TestExportJsonSchema:
         """Schema exports with expected structure."""
         schema = export_json_schema()
         assert "$defs" in schema
-        assert "LayoutNode" in schema["$defs"]
-        assert schema["$defs"]["LayoutNode"]["title"] == "LayoutNode"
+        assert "LayoutNodeSchema" in schema["$defs"]
+        assert schema["$defs"]["LayoutNodeSchema"]["title"] == "LayoutNodeSchema"
