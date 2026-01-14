@@ -1,5 +1,6 @@
 # .agent/scripts/_env-setup.ps1
 # Shared utility to load .env and activate Python virtual environment.
+# Supports both standard venv and conda environments.
 
 Param(
     [Parameter(Mandatory=$true)][string]$EnvFile,
@@ -8,6 +9,19 @@ Param(
 
 function Activate-Venv {
     param([string]$Path)
+
+    # Check for conda environment (has conda-meta directory)
+    $CondaMeta = Join-Path $Path "conda-meta"
+    if (Test-Path $CondaMeta) {
+        Write-Host "Activating conda environment from $Path" -ForegroundColor Cyan
+        # Prepend to PATH and set conda env vars (minimal activation)
+        $env:PATH = "$Path;$Path\Library\bin;$Path\Scripts;$env:PATH"
+        $env:CONDA_PREFIX = $Path
+        $env:CONDA_DEFAULT_ENV = (Split-Path $Path -Leaf)
+        return $true
+    }
+
+    # Standard venv activation
     $ActivateScript = Join-Path $Path "Scripts\Activate.ps1"
     if (Test-Path $ActivateScript) {
         Write-Host "Activating virtual environment from $Path" -ForegroundColor Cyan
