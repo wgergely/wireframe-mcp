@@ -11,7 +11,6 @@ from src.schema import export_llm_schema
 from src.vector.serializer import LayoutSerializer
 
 if TYPE_CHECKING:
-    from src.mid import LayoutNode
     from src.vector import VectorStore
 
 
@@ -156,25 +155,29 @@ You must use only these component types in your layouts:
 
         examples: list[str] = []
         example_ids: list[str] = []
+        max_len = self._config.max_example_length
 
         for r in results:
             metadata = self._store.get_metadata(r.id)
-            if metadata and "text" in metadata:
-                text = metadata["text"]
-                if len(text) > self._config.max_example_length:
-                    text = text[: self._config.max_example_length] + "..."
-                examples.append(f"### Example: {r.id}\n```\n{text}\n```")
-                example_ids.append(r.id)
+            if not metadata or "text" not in metadata:
+                continue
+
+            text = metadata["text"]
+            if len(text) > max_len:
+                text = text[:max_len] + "..."
+            examples.append(f"### Example: {r.id}\n```\n{text}\n```")
+            example_ids.append(r.id)
 
         if not examples:
             return "", []
 
-        return f"""## Similar Layout Examples
+        section = f"""## Similar Layout Examples
 
 These are real UI layouts similar to your request:
 
 {chr(10).join(examples)}
-""", example_ids
+"""
+        return section, example_ids
 
     def _format_query(self, query: str) -> str:
         """Format the user query section."""

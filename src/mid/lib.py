@@ -20,9 +20,16 @@ from pydantic import BaseModel, Field
 # Import authoritative definitions from schema module
 from src.schema import (
     COMPONENT_REGISTRY,
+    Alignment,
     ComponentCategory,
     ComponentType,
+    Justify,
     Orientation,
+    TextAlign,
+    TextSize,
+    TextTransform,
+    TextWeight,
+    Wrap,
     export_json_schema,
     get_component_category,
 )
@@ -41,24 +48,80 @@ class LayoutNode(BaseModel):
         flex_ratio: Grid span ratio (1-12) for relative sizing.
         children: Nested child nodes for hierarchical layouts.
         orientation: Layout flow direction for immediate children.
+        align: Cross-axis alignment (align-items).
+        justify: Main-axis distribution (justify-content).
+        gap: Spacing between children in pixels.
+        wrap: Overflow wrap behavior.
+        padding: Internal padding in pixels.
+        text_size: Text size hierarchy.
+        text_weight: Font weight.
+        text_transform: Text case transformation.
+        text_align: Horizontal text alignment.
     """
 
+    # Identity
     id: str = Field(..., description="Unique identifier for the node")
     type: ComponentType = Field(
         ..., description="Component type from restricted vocabulary"
     )
+
+    # Content
     label: str | None = Field(None, description="Human-readable text content")
-    flex_ratio: Annotated[int, Field(ge=1, le=12)] = Field(
-        default=1,
-        description="Grid span ratio (1-12 standard grid system)",
-    )
+
+    # Structure
     children: list["LayoutNode"] = Field(
         default_factory=list,
         description="Nested child nodes for hierarchical layouts",
     )
+
+    # Layout - existing
+    flex_ratio: Annotated[int, Field(ge=1, le=12)] = Field(
+        default=1,
+        description="Grid span ratio (1-12 standard grid system)",
+    )
     orientation: Orientation = Field(
         default=Orientation.VERTICAL,
         description="Layout flow direction for immediate children",
+    )
+
+    # Layout - new
+    align: Alignment | None = Field(
+        default=None,
+        description="Cross-axis alignment (align-items)",
+    )
+    justify: Justify | None = Field(
+        default=None,
+        description="Main-axis distribution (justify-content)",
+    )
+    gap: Annotated[int, Field(ge=0)] | None = Field(
+        default=None,
+        description="Spacing between children in pixels",
+    )
+    wrap: Wrap | None = Field(
+        default=None,
+        description="Overflow wrap behavior",
+    )
+    padding: Annotated[int, Field(ge=0)] | None = Field(
+        default=None,
+        description="Internal padding in pixels",
+    )
+
+    # Text styling
+    text_size: TextSize | None = Field(
+        default=None,
+        description="Text size hierarchy (title/heading/body/caption)",
+    )
+    text_weight: TextWeight | None = Field(
+        default=None,
+        description="Font weight (light/normal/bold)",
+    )
+    text_transform: TextTransform | None = Field(
+        default=None,
+        description="Text case transformation",
+    )
+    text_align: TextAlign | None = Field(
+        default=None,
+        description="Horizontal text alignment",
     )
 
     model_config = {

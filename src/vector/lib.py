@@ -4,11 +4,15 @@ Provides high-level API for indexing corpus data and searching
 for similar UI layouts using vector embeddings.
 """
 
+import hashlib
 import json
 import logging
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Callable
+
+import numpy as np
 
 from src.corpus.provider.base import BaseProvider, StandardizedData
 from src.mid import LayoutNode
@@ -16,11 +20,17 @@ from src.mid import LayoutNode
 from .backend import EmbeddingBackend, LocalBackend, VoyageBackend
 from .index import FAISSIndex
 from .serializer import LayoutSerializer, SerializationConfig, SerializedLayout
+from .types import (
+    DEFAULT_EMBEDDING_BATCH_SIZE,
+    DEFAULT_SERIALIZATION_WORKERS,
+    UNKNOWN_DATASET,
+    UNKNOWN_SOURCE,
+    BackendType,
+    ItemMetadata,
+    MetadataKey,
+)
 
 logger = logging.getLogger(__name__)
-
-# Default batch size for embedding API calls
-DEFAULT_BATCH_SIZE = 100
 
 
 @dataclass
@@ -71,6 +81,12 @@ class VectorStore:
     Orchestrates serialization, embedding, and indexing of corpus data.
     Provides search interface for finding similar UI layouts.
 
+    Features:
+        - Parallel serialization with configurable worker threads
+        - Embedding cache to skip duplicate content
+        - GPU-accelerated FAISS indexing when available
+        - Batched embedding generation
+
     Example:
         >>> store = VectorStore(backend="voyage")
         >>> store.index_corpus(provider, progress_callback=print)
@@ -79,22 +95,24 @@ class VectorStore:
 
     def __init__(
         self,
-        backend: EmbeddingBackend | Literal["voyage", "local"] = "voyage",
+        backend: EmbeddingBackend | BackendType | str = BackendType.VOYAGE,
         index_path: Path | None = None,
         serializer_config: SerializationConfig | None = None,
+        enable_embedding_cache: bool = True,
     ):
         """Initialize VectorStore.
 
         Args:
-            backend: Embedding backend instance or name ('voyage', 'local').
+            backend: Embedding backend instance, BackendType enum, or name string.
             index_path: Path for persistent index storage.
             serializer_config: Configuration for layout serialization.
+            enable_embedding_cache: Cache embeddings to skip duplicates.
 
         Raises:
             ValueError: If unknown backend name provided.
         """
         # Initialize backend
-        if isinstance(backend, str):
+        if isinstance(backend, (str, BackendType)):
             self._backend = self._create_backend(backend)
         else:
             self._backend = backend
@@ -107,46 +125,101 @@ class VectorStore:
         self._index: FAISSIndex | None = None
         self._metadata: dict[str, dict] = {}  # id -> metadata
 
+        # Embedding cache for deduplication
+        self._enable_cache = enable_embedding_cache
+        self._embedding_cache: dict[str, np.ndarray] = {}
+
         if index_path and Path(index_path).with_suffix(".faiss").exists():
             self.load(index_path)
         else:
             self._index = FAISSIndex(dimension=self._backend.dimension)
 
-    def _create_backend(self, name: str) -> EmbeddingBackend:
-        """Create embedding backend by name.
+    def _create_backend(self, backend: BackendType | str) -> EmbeddingBackend:
+        """Create embedding backend by type.
 
         Args:
-            name: Backend name ('voyage', 'local').
+            backend: BackendType enum or name string.
 
         Returns:
             Initialized EmbeddingBackend instance.
 
         Raises:
-            ValueError: If unknown backend name.
+            ValueError: If unknown backend type.
         """
-        if name == "voyage":
+        # Normalize to BackendType enum
+        if isinstance(backend, str):
+            try:
+                backend = BackendType(backend)
+            except ValueError:
+                valid = [b.value for b in BackendType]
+                raise ValueError(
+                    f"Unknown backend '{backend}'. Valid options: {valid}"
+                ) from None
+
+        if backend == BackendType.VOYAGE:
             return VoyageBackend()
-        elif name == "local":
+        elif backend == BackendType.LOCAL:
             return LocalBackend()
         else:
-            raise ValueError(
-                f"Unknown backend '{name}'. Use 'voyage' or 'local', "
-                "or pass an EmbeddingBackend instance."
-            )
+            # This shouldn't happen with enum, but satisfies type checker
+            raise ValueError(f"Unhandled backend type: {backend}")
+
+    def _get_text_hash(self, text: str) -> str:
+        """Generate hash key for embedding cache.
+
+        Args:
+            text: Text to hash.
+
+        Returns:
+            MD5 hash string.
+        """
+        return hashlib.md5(text.encode()).hexdigest()
+
+    def _get_cached_embedding(self, text: str) -> np.ndarray | None:
+        """Get cached embedding for text.
+
+        Args:
+            text: Text to look up.
+
+        Returns:
+            Cached embedding or None if not found.
+        """
+        if not self._enable_cache:
+            return None
+        key = self._get_text_hash(text)
+        return self._embedding_cache.get(key)
+
+    def _cache_embeddings(self, texts: list[str], vectors: np.ndarray) -> None:
+        """Cache embeddings for texts.
+
+        Creates explicit copies to prevent aliasing issues with mutable arrays.
+
+        Args:
+            texts: List of texts.
+            vectors: Corresponding embedding vectors.
+        """
+        if not self._enable_cache:
+            return
+        for i, text in enumerate(texts):
+            key = self._get_text_hash(text)
+            # Explicit copy to prevent aliasing with source array
+            self._embedding_cache[key] = vectors[i].copy()
 
     def index_corpus(
         self,
         provider: BaseProvider,
-        batch_size: int = DEFAULT_BATCH_SIZE,
-        workers: int = 4,
+        batch_size: int = DEFAULT_EMBEDDING_BATCH_SIZE,
+        workers: int = DEFAULT_SERIALIZATION_WORKERS,
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> IndexStats:
         """Index all data from a corpus provider.
 
+        Uses parallel serialization and embedding cache for optimal performance.
+
         Args:
             provider: Corpus provider to index.
             batch_size: Items per embedding batch.
-            workers: Threads for serialization.
+            workers: Threads for parallel serialization.
             progress_callback: Optional (current, total) progress callback.
 
         Returns:
@@ -172,55 +245,102 @@ class VectorStore:
                 sources={provider.name: 0},
             )
 
-        # Serialize all items
+        # Parallel serialization with progress tracking
         serialized: list[SerializedLayout] = []
-        for i, item in enumerate(items):
-            result = self._serializer.serialize_with_metadata(
-                item.layout,
-                item_id=item.id,
-                source=item.source,
-                dataset=item.dataset,
+        serialized_count = 0
+
+        def on_serialized(result: SerializedLayout) -> None:
+            nonlocal serialized_count
+            serialized_count += 1
+            # Store metadata for retrieval (type-safe)
+            self._metadata[result.id] = ItemMetadata(
+                source=result.source,
+                dataset=result.dataset,
+                text=result.text,
+                node_count=result.node_count,
+                max_depth=result.max_depth,
+                component_summary=result.component_summary,
             )
+            if progress_callback and serialized_count % 100 == 0:
+                # Report serialization progress (first half of work)
+                progress_callback(serialized_count // 2, total)
+
+        # Generate items for batch processing
+        items_for_batch = (
+            (item.layout, item.id, item.source, item.dataset) for item in items
+        )
+
+        # Use parallel serialization
+        logger.info(f"Serializing {total} items with {workers} workers...")
+        for result in self._serializer.serialize_batch(
+            items_for_batch, max_workers=workers, on_complete=on_serialized
+        ):
             serialized.append(result)
-
-            # Store metadata for retrieval
-            self._metadata[item.id] = {
-                "source": item.source,
-                "dataset": item.dataset,
-                "text": result.text,
-                "node_count": result.node_count,
-                "max_depth": result.max_depth,
-                "component_summary": result.component_summary,
-            }
-
-            if progress_callback and (i + 1) % 100 == 0:
-                progress_callback(i + 1, total)
 
         logger.info(f"Serialized {len(serialized)} items, starting embedding...")
 
-        # Embed and index in batches
+        # Embed and index in batches with caching
         indexed = 0
+        cache_hits = 0
+
         for i in range(0, len(serialized), batch_size):
             batch = serialized[i : i + batch_size]
-            texts = [s.text for s in batch]
-            ids = [s.id for s in batch]
 
-            # Generate embeddings
-            vectors = self._backend.embed(texts)
+            # Separate cached vs uncached texts with intra-batch deduplication
+            cached_indices: list[int] = []
+            cached_vectors: list[np.ndarray] = []
+
+            # Track unique uncached texts and which batch indices need them
+            unique_texts: list[str] = []
+            text_to_unique_idx: dict[str, int] = {}  # text -> index in unique_texts
+            batch_idx_to_unique_idx: dict[int, int] = {}  # batch idx -> unique idx
+
+            for j, s in enumerate(batch):
+                cached = self._get_cached_embedding(s.text)
+                if cached is not None:
+                    cached_indices.append(j)
+                    cached_vectors.append(cached)
+                    cache_hits += 1
+                else:
+                    # Intra-batch deduplication: only add unique texts
+                    if s.text not in text_to_unique_idx:
+                        text_to_unique_idx[s.text] = len(unique_texts)
+                        unique_texts.append(s.text)
+                    batch_idx_to_unique_idx[j] = text_to_unique_idx[s.text]
+
+            # Pre-allocate output array
+            all_vectors = np.zeros(
+                (len(batch), self._backend.dimension), dtype=np.float32
+            )
+
+            # Vectorized assignment of cached vectors
+            if cached_vectors:
+                all_vectors[cached_indices] = np.asarray(cached_vectors)
+
+            # Generate embeddings only for unique uncached texts
+            if unique_texts:
+                new_vectors = self._backend.embed(unique_texts)
+                self._cache_embeddings(unique_texts, new_vectors)
+                # Map unique vectors back to all batch indices that need them
+                for batch_idx, unique_idx in batch_idx_to_unique_idx.items():
+                    all_vectors[batch_idx] = new_vectors[unique_idx]
 
             # Add to index
-            self._index.add(vectors, ids)
+            ids = [s.id for s in batch]
+            self._index.add(all_vectors, ids)
             indexed += len(batch)
 
             if progress_callback:
-                progress_callback(indexed, total)
+                # Report embedding progress (second half of work)
+                progress_callback(total // 2 + indexed // 2, total)
 
-            logger.debug(f"Indexed batch {i // batch_size + 1}: {len(batch)} items")
+            logger.debug(
+                f"Indexed batch {i // batch_size + 1}: {len(batch)} items "
+                f"({len(cached_indices)} cached)"
+            )
 
-        # Calculate source counts
-        sources: dict[str, int] = {}
-        for item in items:
-            sources[item.source] = sources.get(item.source, 0) + 1
+        # Calculate source counts using Counter (more efficient)
+        sources = dict(Counter(item.source for item in items))
 
         stats = IndexStats(
             total_items=self._index.size,
@@ -232,7 +352,8 @@ class VectorStore:
 
         logger.info(
             f"Indexing complete: {stats.total_items} items, "
-            f"GPU={stats.is_gpu}, backend={stats.embedding_backend}"
+            f"GPU={stats.is_gpu}, backend={stats.embedding_backend}, "
+            f"cache_hits={cache_hits}"
         )
 
         return stats
@@ -257,15 +378,15 @@ class VectorStore:
             dataset=data.dataset,
         )
 
-        # Store metadata
-        self._metadata[data.id] = {
-            "source": data.source,
-            "dataset": data.dataset,
-            "text": result.text,
-            "node_count": result.node_count,
-            "max_depth": result.max_depth,
-            "component_summary": result.component_summary,
-        }
+        # Store metadata (type-safe)
+        self._metadata[data.id] = ItemMetadata(
+            source=data.source,
+            dataset=data.dataset,
+            text=result.text,
+            node_count=result.node_count,
+            max_depth=result.max_depth,
+            component_summary=result.component_summary,
+        )
 
         # Embed and add
         vectors = self._backend.embed([result.text])
@@ -301,10 +422,11 @@ class VectorStore:
         # Build results with metadata
         results: list[VectorSearchResult] = []
         for raw in raw_results:
-            meta = self._metadata.get(raw.id, {})
+            meta = self._metadata.get(raw.id)
 
             # Apply source filter
-            if source_filter and meta.get("source") != source_filter:
+            source = meta[MetadataKey.SOURCE] if meta else UNKNOWN_SOURCE
+            if source_filter and source != source_filter:
                 continue
 
             results.append(
@@ -312,9 +434,9 @@ class VectorStore:
                     id=raw.id,
                     score=raw.score,
                     rank=len(results),
-                    source=meta.get("source", "unknown"),
-                    dataset=meta.get("dataset", "unknown"),
-                    serialized_text=meta.get("text"),
+                    source=source,
+                    dataset=meta[MetadataKey.DATASET] if meta else UNKNOWN_DATASET,
+                    serialized_text=meta[MetadataKey.TEXT] if meta else None,
                 )
             )
 
@@ -397,10 +519,13 @@ class VectorStore:
         Returns:
             IndexStats with current state.
         """
-        sources: dict[str, int] = {}
-        for meta in self._metadata.values():
-            source = meta.get("source", "unknown")
-            sources[source] = sources.get(source, 0) + 1
+        # Use Counter for efficient source counting
+        sources = dict(
+            Counter(
+                meta.get(MetadataKey.SOURCE, UNKNOWN_SOURCE)
+                for meta in self._metadata.values()
+            )
+        )
 
         return IndexStats(
             total_items=self._index.size if self._index else 0,
@@ -415,6 +540,15 @@ class VectorStore:
         if self._index:
             self._index.clear()
         self._metadata = {}
+
+    def __len__(self) -> int:
+        """Return number of indexed items."""
+        return self._index.size if self._index else 0
+
+    @property
+    def backend_type(self) -> BackendType:
+        """Return the backend type."""
+        return BackendType(self._backend.name)
 
 
 __all__ = [

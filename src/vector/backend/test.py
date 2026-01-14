@@ -38,7 +38,9 @@ class TestModelSpec:
             dimension=384,
             provider=ProviderType.LOCAL,
             max_tokens=512,
-            capabilities=frozenset({ModelCapability.OFFLINE, ModelCapability.BATCH_EMBED}),
+            capabilities=frozenset(
+                {ModelCapability.OFFLINE, ModelCapability.BATCH_EMBED}
+            ),
         )
         assert spec.supports(ModelCapability.OFFLINE)
         assert spec.supports(ModelCapability.BATCH_EMBED)
@@ -215,4 +217,3 @@ class TestCreateBackend:
         # Just verify no error - actual device selection depends on hardware
         backend = create_backend(EmbeddingModel.LOCAL_MINILM, device="cpu")
         assert backend is not None
-

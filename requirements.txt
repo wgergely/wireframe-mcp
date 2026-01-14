@@ -21,3 +21,10 @@ sentence-transformers>=2.2
 datasets
 Pillow
 tqdm
+
+# LLM Backends
+openai>=1.0.0
+
+# HTTP Client (for Kroki rendering)
+httpx>=0.25.0
+

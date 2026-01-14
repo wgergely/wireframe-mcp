@@ -70,12 +70,12 @@ class TranspilationContext:
     @property
     def has_rag_context(self) -> bool:
         """Check if RAG context is available."""
-        return len(self.similar_layouts) > 0
+        return bool(self.similar_layouts)
 
     @property
     def has_hints(self) -> bool:
         """Check if layout hints are available."""
-        return len(self.layout_hints) > 0
+        return bool(self.layout_hints)
 
 
 __all__ = [
@@ -91,4 +91,3 @@ __all__ = [
     "LayoutHint",
     "TranspilationContext",
 ]
-

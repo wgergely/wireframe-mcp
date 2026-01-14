@@ -25,6 +25,10 @@ services:
       - LOG_LEVEL=DEBUG
       # Vector embedding configuration
       - VECTOR_USE_GPU=true
+      # Kroki service URL (internal Docker network)
+      - KROKI_URL=http://kroki:8000
+    depends_on:
+      - kroki
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "python", "-c", "from src import list_providers; list_providers()" ]
@@ -32,3 +36,19 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # Kroki diagram rendering service
+  kroki:
+    image: yuzutech/kroki
+    container_name: kroki
+    ports:
+      - "8000:8000"
+    environment:
+      - KROKI_SAFE_MODE=unsafe
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+

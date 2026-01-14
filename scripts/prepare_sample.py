@@ -9,8 +9,8 @@ Usage:
 
 import argparse
 import json
-from pathlib import Path
 from itertools import islice
+from pathlib import Path
 
 from src.config import get_data_dir
 from src.corpus.provider.rico import Provider as RicoProvider
@@ -67,7 +67,7 @@ def main():
             provider.fetch()
         else:
             print(f"ERROR: No data found for {args.provider}.")
-            print(f"Run with --fetch to download, or manually run:")
+            print("Run with --fetch to download, or manually run:")
             print(f"  python . corpus fetch --provider {args.provider}")
             return 1
 
@@ -98,15 +98,19 @@ def main():
             dataset=item.dataset,
         )
 
-        samples_data.append({
-            "id": serialized.id,
-            "source": serialized.source,
-            "dataset": serialized.dataset,
-            "node_count": serialized.node_count,
-            "max_depth": serialized.max_depth,
-            "component_summary": serialized.component_summary,
-            "text": serialized.text[:500] + "..." if len(serialized.text) > 500 else serialized.text,
-        })
+        samples_data.append(
+            {
+                "id": serialized.id,
+                "source": serialized.source,
+                "dataset": serialized.dataset,
+                "node_count": serialized.node_count,
+                "max_depth": serialized.max_depth,
+                "component_summary": serialized.component_summary,
+                "text": serialized.text[:500] + "..."
+                if len(serialized.text) > 500
+                else serialized.text,
+            }
+        )
 
         processed += 1
         if processed % 10 == 0:
@@ -129,17 +133,17 @@ def main():
             for comp, count in s["component_summary"].items():
                 all_components[comp] = all_components.get(comp, 0) + count
 
-        print(f"\n--- Sample Statistics ---")
+        print("\n--- Sample Statistics ---")
         print(f"Total samples: {len(samples_data)}")
         print(f"Average nodes per layout: {avg_nodes:.1f}")
         print(f"Average tree depth: {avg_depth:.1f}")
-        print(f"\nTop 10 component types:")
+        print("\nTop 10 component types:")
         for comp, count in sorted(all_components.items(), key=lambda x: -x[1])[:10]:
             print(f"  {comp}: {count}")
 
     # Show sample serialization
     if samples_data:
-        print(f"\n--- Sample Serialization (first item) ---")
+        print("\n--- Sample Serialization (first item) ---")
         print(samples_data[0]["text"])
 
     return 0

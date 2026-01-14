@@ -11,11 +11,18 @@ Example usage:
 
 from .lib import (
     COMPONENT_CATEGORIES,
+    Alignment,
     ComponentCategory,
     ComponentType,
+    Justify,
     LayoutNode,
     Orientation,
+    TextAlign,
+    TextSize,
+    TextTransform,
+    TextWeight,
     ValidationError,
+    Wrap,
     export_json_schema,
     get_component_category,
     is_valid,
@@ -23,11 +30,22 @@ from .lib import (
 )
 
 __all__ = [
+    # Layout enums
+    "Alignment",
+    "Justify",
     "Orientation",
+    "Wrap",
+    # Text enums
+    "TextAlign",
+    "TextSize",
+    "TextTransform",
+    "TextWeight",
+    # Component enums
     "ComponentType",
     "ComponentCategory",
     "COMPONENT_CATEGORIES",
     "get_component_category",
+    # Core model
     "LayoutNode",
     "ValidationError",
     "validate_layout",

@@ -14,13 +14,20 @@ Example usage:
 
 from .lib import (
     COMPONENT_REGISTRY,
+    Alignment,
     ComponentCategory,
     ComponentConstraints,
     ComponentMeta,
     ComponentType,
+    Justify,
     LayoutNodeSchema,
     Orientation,
     SchemaValidationError,
+    TextAlign,
+    TextSize,
+    TextTransform,
+    TextWeight,
+    Wrap,
     export_component_enum_schema,
     export_json_schema,
     export_llm_schema,
@@ -36,10 +43,18 @@ from .lib import (
 )
 
 __all__ = [
-    # Enums
+    # Enums - Layout
+    "Alignment",
     "ComponentCategory",
     "ComponentType",
+    "Justify",
     "Orientation",
+    "Wrap",
+    # Enums - Text
+    "TextAlign",
+    "TextSize",
+    "TextTransform",
+    "TextWeight",
     # Metadata
     "ComponentConstraints",
     "ComponentMeta",

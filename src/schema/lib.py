@@ -40,6 +40,88 @@ class Orientation(str, Enum):
     OVERLAY = "overlay"
 
 
+class Alignment(str, Enum):
+    """Cross-axis alignment for container children (CSS align-items).
+
+    Controls how children align perpendicular to the main axis:
+    - START: Align to start edge
+    - CENTER: Center along cross-axis
+    - END: Align to end edge
+    - STRETCH: Stretch to fill container (default)
+    """
+
+    START = "start"
+    CENTER = "center"
+    END = "end"
+    STRETCH = "stretch"
+
+
+class Justify(str, Enum):
+    """Main-axis distribution for container children (CSS justify-content).
+
+    Controls how space is distributed along the main axis:
+    - START: Pack children at start
+    - CENTER: Center children
+    - END: Pack children at end
+    - BETWEEN: Distribute with space between
+    - AROUND: Distribute with space around
+    """
+
+    START = "start"
+    CENTER = "center"
+    END = "end"
+    BETWEEN = "between"
+    AROUND = "around"
+
+
+class Wrap(str, Enum):
+    """Wrap behavior for container overflow (CSS flex-wrap)."""
+
+    NONE = "none"
+    WRAP = "wrap"
+
+
+class TextSize(str, Enum):
+    """Text size hierarchy for visual importance.
+
+    Maps to typical heading/body scales:
+    - TITLE: Large display text (h1-h2 equivalent)
+    - HEADING: Section headings (h3-h4 equivalent)
+    - BODY: Default body text
+    - CAPTION: Small supporting text
+    """
+
+    TITLE = "title"
+    HEADING = "heading"
+    BODY = "body"
+    CAPTION = "caption"
+
+
+class TextWeight(str, Enum):
+    """Font weight for text emphasis."""
+
+    LIGHT = "light"
+    NORMAL = "normal"
+    BOLD = "bold"
+
+
+class TextTransform(str, Enum):
+    """Text case transformation (CSS text-transform)."""
+
+    NONE = "none"
+    UPPERCASE = "uppercase"
+    LOWERCASE = "lowercase"
+    CAPITALIZE = "capitalize"
+
+
+class TextAlign(str, Enum):
+    """Horizontal text alignment."""
+
+    LEFT = "left"
+    CENTER = "center"
+    RIGHT = "right"
+
+
 class ComponentType(str, Enum):
     """Rico-based UI component taxonomy (26 categories).
 

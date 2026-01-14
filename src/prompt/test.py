@@ -38,7 +38,7 @@ class TestPromptBuilder:
         """Test building prompt without VectorStore."""
         builder = PromptBuilder()
         prompt = builder.build("login form")
-        
+
         assert "UI Component Schema" in prompt
         assert "login form" in prompt
         assert "Generate a UI layout" in prompt
@@ -49,7 +49,7 @@ class TestPromptBuilder:
         config = PromptConfig(include_examples=False)
         builder = PromptBuilder(config=config)
         prompt = builder.build("dashboard")
-        
+
         assert "UI Component Schema" in prompt
         assert "Similar Layout Examples" not in prompt
 
@@ -59,7 +59,7 @@ class TestPromptBuilder:
         config = PromptConfig(include_schema=False, include_examples=False)
         builder = PromptBuilder(config=config)
         prompt = builder.build("settings page")
-        
+
         assert "UI Component Schema" not in prompt
         assert "Your Task" in prompt
 
@@ -68,7 +68,7 @@ class TestPromptBuilder:
         """Test build_with_context returns context info."""
         builder = PromptBuilder()
         prompt, context = builder.build_with_context("navigation menu")
-        
+
         assert context.query == "navigation menu"
         assert context.schema_included is True
         assert context.example_count == 0  # No store

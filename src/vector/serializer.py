@@ -9,8 +9,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Iterator
 
-from src.mid import LayoutNode, Orientation
+from src.mid import LayoutNode
 from src.schema import ComponentType, get_component_category
+
+from .types import (
+    DEFAULT_ORIENTATION,
+    ORIENTATION_CODES,
+    OrientationCode,
+    get_default_workers,
+)
 
 
 class SerializationFormat(str, Enum):
@@ -97,10 +104,11 @@ class LayoutSerializer:
             Text representation of the layout tree.
         """
         if self.config.format == SerializationFormat.INDENTED:
-            lines = self._serialize_indented(node, depth=0)
+            lines, _ = self._serialize_indented_with_stats(node, depth=0)
             return "\n".join(lines)
         else:
-            return self._serialize_linearized(node)
+            text, _ = self._serialize_linearized_with_stats(node)
+            return text
 
     def serialize_with_metadata(
         self,
@@ -140,19 +148,21 @@ class LayoutSerializer:
     def serialize_batch(
         self,
         items: Iterator[tuple[LayoutNode, str, str, str]],
-        max_workers: int = 4,
+        max_workers: int | None = None,
         on_complete: Callable[[SerializedLayout], None] | None = None,
     ) -> Iterator[SerializedLayout]:
         """Batch serialize with multi-threaded processing.
 
         Args:
             items: Iterator of (node, id, source, dataset) tuples.
-            max_workers: Number of concurrent threads.
+            max_workers: Number of concurrent threads. Defaults to CPU count.
             on_complete: Optional callback for each completed item.
 
         Yields:
             SerializedLayout results as they complete.
         """
+        if max_workers is None:
+            max_workers = get_default_workers()
         # Collect items for submission (can't iterate twice)
         item_list = list(items)
 
@@ -170,19 +180,6 @@ class LayoutSerializer:
                     on_complete(result)
                 yield result
 
-    def _serialize_indented(self, node: LayoutNode, depth: int) -> list[str]:
-        """Serialize node to indented format lines.
-
-        Args:
-            node: Current node to serialize.
-            depth: Current indentation depth.
-
-        Returns:
-            List of text lines for this node and children.
-        """
-        lines, _ = self._serialize_indented_with_stats(node, depth)
-        return lines
-
     def _serialize_indented_with_stats(
         self, node: LayoutNode, depth: int
     ) -> tuple[list[str], dict]:
@@ -198,16 +195,11 @@ class LayoutSerializer:
         """
         lines = []
         indent = " " * (depth * self.config.indent_size)
-
-        # Build node representation
         parts = []
 
-        # Get type value (handle both enum and string)
-        node_type = node.type
-        if isinstance(node_type, ComponentType):
-            type_value = node_type.value
-        else:
-            type_value = str(node_type)
+        # LayoutNode uses use_enum_values=True, so type/orientation are strings
+        type_value = str(node.type)
+        orientation = str(node.orientation)
 
         # Category and type
         if self.config.include_category:
@@ -223,15 +215,8 @@ class LayoutSerializer:
         parts.append(node.id)
 
         # Orientation (only if non-default vertical)
-        if self.config.include_orientation:
-            orientation = node.orientation
-            if isinstance(orientation, Orientation):
-                orient_value = orientation.value
-            else:
-                orient_value = str(orientation)
-
-            if orient_value != "vertical":
-                parts.append(f"@{orient_value}")
+        if self.config.include_orientation and orientation != DEFAULT_ORIENTATION:
+            parts.append(f"@{orientation}")
 
         # Flex ratio (only if non-default 1)
         if self.config.include_flex and node.flex_ratio != 1:
@@ -273,18 +258,6 @@ class LayoutSerializer:
         }
         return lines, stats
 
-    def _serialize_linearized(self, node: LayoutNode) -> str:
-        """Serialize node to linearized sequence format.
-
-        Args:
-            node: Root node to serialize.
-
-        Returns:
-            Compact string with XML-like tags.
-        """
-        text, _ = self._serialize_linearized_with_stats(node)
-        return text
-
     def _serialize_linearized_with_stats(self, node: LayoutNode) -> tuple[str, dict]:
         """Serialize node to linearized format with single-pass statistics.
 
@@ -296,39 +269,36 @@ class LayoutSerializer:
             max_depth, and components dict.
         """
         parts: list[str] = []
-        stats = {"node_count": 0, "max_depth": 0, "components": {}}
-        self._linearize_node_with_stats(node, parts, stats, depth=0)
+        stats: dict = {"node_count": 0, "max_depth": 0, "components": {}}
+        self._linearize_node(node, parts, stats, depth=0)
         return " ".join(parts), stats
 
-    def _linearize_node(self, node: LayoutNode, parts: list[str]) -> None:
-        """Recursively linearize a node into parts list.
+    def _linearize_node(
+        self, node: LayoutNode, parts: list[str], stats: dict, depth: int
+    ) -> None:
+        """Recursively linearize a node while collecting statistics.
 
         Args:
             node: Current node.
             parts: Accumulator list for string parts.
+            stats: Mutable stats dict to update.
+            depth: Current tree depth.
         """
-        # Get type value
-        node_type = node.type
-        if isinstance(node_type, ComponentType):
-            type_value = node_type.value
-        else:
-            type_value = str(node_type)
+        # LayoutNode uses use_enum_values=True, so type/orientation are strings
+        type_value = str(node.type)
+
+        # Update stats
+        stats["node_count"] += 1
+        stats["max_depth"] = max(stats["max_depth"], depth)
+        stats["components"][type_value] = stats["components"].get(type_value, 0) + 1
 
         # Orientation short code
-        orientation = node.orientation
-        if isinstance(orientation, Orientation):
-            orient_value = orientation.value
-        else:
-            orient_value = str(orientation)
-
-        orient_code = {"horizontal": "H", "vertical": "V", "overlay": "O"}.get(
-            orient_value, "V"
+        orient_code = ORIENTATION_CODES.get(
+            str(node.orientation), OrientationCode.VERTICAL.value
         )
 
-        is_leaf = len(node.children) == 0
-
-        if is_leaf:
-            # Self-closing tag
+        if not node.children:
+            # Self-closing tag (leaf node)
             if node.label:
                 label = self._escape_label(node.label)
                 parts.append(f'<{node.id}:{type_value}:"{label}"/>')
@@ -340,7 +310,7 @@ class LayoutSerializer:
 
             # Children
             for child in node.children:
-                self._linearize_node(child, parts)
+                self._linearize_node(child, parts, stats, depth + 1)
 
             # Closing tag
             parts.append(f"</{node.id}>")
@@ -360,66 +330,6 @@ class LayoutSerializer:
 
         # Escape quotes and angle brackets
         return label.replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-
-    def _count_nodes(self, node: LayoutNode) -> int:
-        """Count total nodes in tree.
-
-        Args:
-            node: Root node.
-
-        Returns:
-            Total node count including root.
-        """
-        count = 1
-        for child in node.children:
-            count += self._count_nodes(child)
-        return count
-
-    def _max_depth(self, node: LayoutNode, current: int = 0) -> int:
-        """Calculate maximum tree depth.
-
-        Args:
-            node: Current node.
-            current: Current depth level.
-
-        Returns:
-            Maximum depth from this node down.
-        """
-        if not node.children:
-            return current
-
-        return max(self._max_depth(child, current + 1) for child in node.children)
-
-    def _count_components(self, node: LayoutNode) -> dict[str, int]:
-        """Count component types in tree.
-
-        Args:
-            node: Root node.
-
-        Returns:
-            Dict mapping component type to count.
-        """
-        counts: dict[str, int] = {}
-        self._accumulate_components(node, counts)
-        return counts
-
-    def _accumulate_components(self, node: LayoutNode, counts: dict[str, int]) -> None:
-        """Recursively accumulate component counts.
-
-        Args:
-            node: Current node.
-            counts: Accumulator dict.
-        """
-        node_type = node.type
-        if isinstance(node_type, ComponentType):
-            type_value = node_type.value
-        else:
-            type_value = str(node_type)
-
-        counts[type_value] = counts.get(type_value, 0) + 1
-
-        for child in node.children:
-            self._accumulate_components(child, counts)
 
 
 def serialize_layout(

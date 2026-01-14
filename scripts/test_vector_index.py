@@ -8,13 +8,12 @@ Usage:
 
 import argparse
 import time
-from pathlib import Path
 from itertools import islice
 
 from src.config import get_data_dir
 from src.corpus.provider.rico import Provider as RicoProvider
 from src.vector import VectorStore
-from src.vector.backend import create_backend, EmbeddingModel
+from src.vector.backend import EmbeddingModel, create_backend
 
 
 def main():
@@ -50,6 +49,7 @@ def main():
     print("Initializing embedding backend...")
     if args.backend == "voyage":
         import os
+
         if not os.environ.get("VOYAGE_API_KEY"):
             print("ERROR: VOYAGE_API_KEY not set")
             return 1
@@ -68,7 +68,7 @@ def main():
     # Index items
     print(f"Indexing {args.limit} items...")
     start_time = time.time()
-    
+
     indexed = 0
     for item in islice(provider.process(), args.limit):
         if item.layout is None:
@@ -83,11 +83,11 @@ def main():
 
     index_time = time.time() - start_time
     print(f"\nIndexed {indexed} items in {index_time:.2f}s")
-    print(f"  Indexing rate: {indexed/index_time:.1f} items/sec")
+    print(f"  Indexing rate: {indexed / index_time:.1f} items/sec")
 
     # Get stats
     stats = store.stats()
-    print(f"\n--- Index Statistics ---")
+    print("\n--- Index Statistics ---")
     print(f"Total items: {stats.total_items}")
     print(f"Dimension: {stats.dimension}")
     print(f"Backend: {stats.embedding_backend}")
@@ -103,7 +103,7 @@ def main():
         "navigation menu with icons",
     ]
 
-    print(f"\n--- Search Tests ---")
+    print("\n--- Search Tests ---")
     for query in test_queries:
         print(f"\nQuery: '{query}'")
         start_time = time.time()
@@ -112,10 +112,10 @@ def main():
 
         print(f"  Latency: {search_time:.1f}ms")
         for r in results:
-            print(f"  [{r.rank+1}] {r.id} (score: {r.score:.3f})")
+            print(f"  [{r.rank + 1}] {r.id} (score: {r.score:.3f})")
 
     # Save index
-    print(f"\n--- Saving Index ---")
+    print("\n--- Saving Index ---")
     store.save()
     print(f"Index saved to: {index_path}")
 
@@ -125,7 +125,7 @@ def main():
     store2.load(index_path)
     stats2 = store2.stats()
     print(f"Loaded {stats2.total_items} items")
-    
+
     # Verify search works after load
     results = store2.search("login form", k=1)
     if results:

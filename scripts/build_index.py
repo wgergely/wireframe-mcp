@@ -6,16 +6,14 @@ Usage:
 
 import argparse
 import time
-from pathlib import Path
 from itertools import islice
 
 from src.config import get_data_dir
-from src.corpus.provider.rico import Provider as RicoProvider
-from src.corpus.provider.enrico import Provider as EnricoProvider  
 from src.corpus.provider.egfe import Provider as EGFEProvider
+from src.corpus.provider.enrico import Provider as EnricoProvider
+from src.corpus.provider.rico import Provider as RicoProvider
 from src.vector import VectorStore
-from src.vector.backend import create_backend, EmbeddingModel
-
+from src.vector.backend import EmbeddingModel, create_backend
 
 PROVIDERS = {
     "rico": lambda d: RicoProvider(d, dataset_type="semantic"),
@@ -59,7 +57,7 @@ def main():
 
     data_dir = get_data_dir()
     index_path = data_dir / args.index_name
-    
+
     print(f"Provider: {args.provider}")
     print(f"Backend: {args.backend}")
     print(f"Index path: {index_path}")
@@ -75,6 +73,7 @@ def main():
     # Create backend
     if args.backend == "voyage":
         import os
+
         if not os.environ.get("VOYAGE_API_KEY"):
             print("ERROR: VOYAGE_API_KEY not set")
             return 1
@@ -107,11 +106,11 @@ def main():
         def __init__(self, provider, limit):
             self._provider = provider
             self._limit = limit
-        
+
         @property
         def name(self):
             return self._provider.name
-        
+
         def process(self):
             items = self._provider.process()
             if self._limit:
@@ -127,7 +126,7 @@ def main():
 
     elapsed = time.time() - start
     print(f"\nIndexed {stats.total_items} items in {elapsed:.1f}s")
-    print(f"Rate: {stats.total_items/elapsed:.1f} items/sec")
+    print(f"Rate: {stats.total_items / elapsed:.1f} items/sec")
     print(f"GPU: {stats.is_gpu}")
 
     # Save

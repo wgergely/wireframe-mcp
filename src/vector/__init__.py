@@ -13,8 +13,8 @@ GPU Support:
     - VECTOR_USE_GPU=false (force CPU)
 
 Example usage:
-    >>> from src.vector import VectorStore
-    >>> store = VectorStore(backend="voyage")
+    >>> from src.vector import VectorStore, BackendType
+    >>> store = VectorStore(backend=BackendType.VOYAGE)
     >>> store.index_corpus(provider)
     >>> results = store.search("login form with social auth")
 """
@@ -29,8 +29,21 @@ from .serializer import (
     SerializedLayout,
     serialize_layout,
 )
+from .types import (
+    BackendType,
+    EnvVar,
+    ItemMetadata,
+    MetadataKey,
+    OrientationCode,
+)
 
 __all__ = [
+    # Types and enums
+    "BackendType",
+    "EnvVar",
+    "ItemMetadata",
+    "MetadataKey",
+    "OrientationCode",
     # Serialization
     "LayoutSerializer",
     "SerializationConfig",

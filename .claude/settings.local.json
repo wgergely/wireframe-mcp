@@ -50,7 +50,10 @@
       "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" status --short)",
       "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" diff --cached)",
       "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" diff)",
-      "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" log --oneline -5)"
+      "Bash(git -C \"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\feature-investigate\" log --oneline -5)",
+      "Bash(\"Y:\\\\code\\\\wireframe-mcp-worktrees\\\\venv-win\\\\Scripts\\\\python.exe\" -m ruff format src/ir src/llm src/mid src/output src/prompt)",
+      "Bash(pip install:*)",
+      "Bash(source ../venv-win/Scripts/activate)"
     ]
   }
 }
