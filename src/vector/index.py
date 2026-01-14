@@ -13,6 +13,8 @@ from typing import Any
 
 import numpy as np
 
+from .types import OPTIMAL_ADD_BATCH_SIZE, EnvVar, parse_bool_env
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,11 +70,9 @@ class FAISSIndex:
         # Determine GPU usage
         if use_gpu is None:
             # Check environment override
-            env_gpu = os.environ.get("VECTOR_USE_GPU", "").lower()
-            if env_gpu == "false":
-                use_gpu = False
-            elif env_gpu == "true":
-                use_gpu = True
+            env_gpu = parse_bool_env(os.environ.get(EnvVar.GPU_ENABLED, ""))
+            if env_gpu is not None:
+                use_gpu = env_gpu and self._detect_gpu()
             else:
                 use_gpu = self._detect_gpu()
         elif use_gpu:
@@ -90,7 +90,22 @@ class FAISSIndex:
             import faiss
 
             if hasattr(faiss, "get_num_gpus"):
-                return faiss.get_num_gpus() > 0
+                num_gpus = faiss.get_num_gpus()
+                if num_gpus > 0:
+                    return True
+                # Warn if GPU expected but unavailable (likely wrong package)
+                if not hasattr(faiss, "StandardGpuResources"):
+                    logger.warning(
+                        "FAISS GPU unavailable: faiss-cpu installed. "
+                        "Install faiss-gpu for GPU support: "
+                        "conda install -c conda-forge faiss-gpu"
+                    )
+                else:
+                    logger.warning(
+                        "FAISS reports 0 GPUs. Check CUDA drivers or "
+                        "verify faiss-gpu is installed (not faiss-cpu)"
+                    )
+                return False
             return False
         except ImportError:
             return False
@@ -147,14 +162,23 @@ class FAISSIndex:
         """Check if using GPU index."""
         return self._is_gpu
 
-    def add(self, vectors: np.ndarray, ids: list[str]) -> None:
+    def add(
+        self,
+        vectors: np.ndarray,
+        ids: list[str],
+        normalize: bool = True,
+        batch_size: int = OPTIMAL_ADD_BATCH_SIZE,
+    ) -> None:
         """Add vectors to the index.
 
         Vectors are normalized before adding for cosine similarity.
+        Large batches are processed efficiently using optimal chunk sizes.
 
         Args:
             vectors: NumPy array of shape (n, dimension).
             ids: List of n string identifiers.
+            normalize: Whether to normalize vectors (set False if pre-normalized).
+            batch_size: Batch size for chunked adding (large datasets).
 
         Raises:
             ValueError: If vectors and ids length mismatch.
@@ -179,13 +203,32 @@ class FAISSIndex:
             )
 
         # Normalize for cosine similarity (inner product on normalized = cosine)
+        if normalize:
+            vectors = self._normalize_vectors(vectors)
+
+        # Add to index in optimal batches for large datasets
+        if len(vectors) > batch_size:
+            for i in range(0, len(vectors), batch_size):
+                end = min(i + batch_size, len(vectors))
+                self._index.add(vectors[i:end])
+                self._id_map.extend(ids[i:end])
+        else:
+            self._index.add(vectors)
+            self._id_map.extend(ids)
+
+    @staticmethod
+    def _normalize_vectors(vectors: np.ndarray) -> np.ndarray:
+        """Normalize vectors for cosine similarity.
+
+        Args:
+            vectors: Input vectors of shape (n, dimension).
+
+        Returns:
+            Normalized vectors.
+        """
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
-        vectors = vectors / norms
-
-        # Add to index
-        self._index.add(vectors)
-        self._id_map.extend(ids)
+        return vectors / norms
 
     def search(self, query: np.ndarray, k: int = 5) -> list[SearchResult]:
         """Search for similar vectors.
@@ -205,10 +248,8 @@ class FAISSIndex:
         if query.ndim == 1:
             query = query.reshape(1, -1)
 
-        # Normalize query
-        norm = np.linalg.norm(query)
-        if norm > 0:
-            query = query / norm
+        # Normalize query using shared method
+        query = self._normalize_vectors(query)
 
         # Limit k to index size
         k = min(k, self.size)
@@ -306,11 +347,9 @@ class FAISSIndex:
 
         # Determine GPU usage
         if use_gpu is None:
-            env_gpu = os.environ.get("VECTOR_USE_GPU", "").lower()
-            if env_gpu == "false":
-                use_gpu = False
-            elif env_gpu == "true":
-                use_gpu = instance._detect_gpu()
+            env_gpu = parse_bool_env(os.environ.get(EnvVar.GPU_ENABLED, ""))
+            if env_gpu is not None:
+                use_gpu = env_gpu and instance._detect_gpu()
             else:
                 use_gpu = instance._detect_gpu()
 
