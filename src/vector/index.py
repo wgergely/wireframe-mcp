@@ -89,23 +89,26 @@ class FAISSIndex:
         try:
             import faiss
 
-            if hasattr(faiss, "get_num_gpus"):
-                num_gpus = faiss.get_num_gpus()
-                if num_gpus > 0:
-                    return True
-                # Warn if GPU expected but unavailable (likely wrong package)
-                if not hasattr(faiss, "StandardGpuResources"):
-                    logger.warning(
-                        "FAISS GPU unavailable: faiss-cpu installed. "
-                        "Install faiss-gpu for GPU support: "
-                        "conda install -c conda-forge faiss-gpu"
-                    )
-                else:
-                    logger.warning(
-                        "FAISS reports 0 GPUs. Check CUDA drivers or "
-                        "verify faiss-gpu is installed (not faiss-cpu)"
-                    )
-                return False
+            has_gpu_support = hasattr(faiss, "StandardGpuResources")
+            num_gpus = faiss.get_num_gpus() if hasattr(faiss, "get_num_gpus") else 0
+
+            if num_gpus > 0:
+                return True
+
+            # Diagnose GPU unavailability
+            if not has_gpu_support:
+                # faiss-cpu package installed
+                logger.warning(
+                    "FAISS package mismatch: faiss-cpu installed (no GPU support). "
+                    "To enable GPU: pip uninstall faiss-cpu && "
+                    "conda install -c conda-forge faiss-gpu"
+                )
+            else:
+                # faiss-gpu installed but no GPU detected
+                logger.warning(
+                    "GPU not available: faiss-gpu installed but no CUDA GPU detected. "
+                    "Check: nvidia-smi, CUDA drivers, or GPU memory availability"
+                )
             return False
         except ImportError:
             return False
