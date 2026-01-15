@@ -1,0 +1,41 @@
+# Production overrides for wireframe-mcp
+# Optimized for deployment with GPU support
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up -d
+#
+# Features:
+#   - Source code baked into image (no host mounts)
+#   - GPU passthrough enabled via NVIDIA runtime
+#   - Production logging level
+#   - Resource limits configured
+
+services:
+  wireframe-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: prod
+    image: wireframe-mcp:prod
+    container_name: wireframe-mcp-prod
+    environment:
+      - LOG_LEVEL=INFO
+    # GPU support via NVIDIA Container Toolkit
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Production healthcheck
+    healthcheck:
+      test: ["CMD", "python", "-c", "from src import list_providers; list_providers()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  kroki:
+    # Kroki in production: no exposed ports, internal network only
+    ports: []

@@ -15,14 +15,14 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.corpus import CorpusManager  # noqa: E402
+from src.corpus import CorpusManager
 from src.corpus.normalizer import (
     count_components,
     extract_text_content,
     node_count,
     tree_depth,
-)  # noqa: E402
-from src.mid import ComponentType, is_valid  # noqa: E402
+)
+from src.mid import ComponentType, is_valid
 
 
 def audit_provider(manager: CorpusManager, provider_name: str, limit: int = 50) -> dict:
@@ -138,21 +138,17 @@ def audit_provider(manager: CorpusManager, provider_name: str, limit: int = 50) 
     total = metrics["total"]
     if total > 0:
         print(f"\n  Samples analyzed: {total}")
-        print(
-            f"  Hierarchy: {metrics['has_hierarchy']}/{total} ({100 * metrics['has_hierarchy'] / total:.0f}%)"
-        )
-        print(
-            f"  Layout: {metrics['has_layout']}/{total} ({100 * metrics['has_layout'] / total:.0f}%)"
-        )
-        print(
-            f"  Layout valid: {metrics['layout_valid']}/{total} ({100 * metrics['layout_valid'] / total:.0f}%)"
-        )
-        print(
-            f"  Screenshots: {metrics['screenshot_exists']}/{total} ({100 * metrics['screenshot_exists'] / total:.0f}%)"
-        )
-        print(
-            f"  Has text: {metrics['has_text_content']}/{total} ({100 * metrics['has_text_content'] / total:.0f}%)"
-        )
+        hier_pct = 100 * metrics['has_hierarchy'] / total
+        print(f"  Hierarchy: {metrics['has_hierarchy']}/{total} ({hier_pct:.0f}%)")
+        layout_pct = 100 * metrics['has_layout'] / total
+        print(f"  Layout: {metrics['has_layout']}/{total} ({layout_pct:.0f}%)")
+        valid_pct = 100 * metrics['layout_valid'] / total
+        print(f"  Layout valid: {metrics['layout_valid']}/{total} ({valid_pct:.0f}%)")
+        scrn_pct = 100 * metrics['screenshot_exists'] / total
+        sc_cnt = metrics['screenshot_exists']
+        print(f"  Screenshots: {sc_cnt}/{total} ({scrn_pct:.0f}%)")
+        text_pct = 100 * metrics['has_text_content'] / total
+        print(f"  Has text: {metrics['has_text_content']}/{total} ({text_pct:.0f}%)")
         print(f"\n  Avg tree depth: {metrics['avg_tree_depth']:.1f}")
         print(f"  Avg node count: {metrics['avg_node_count']:.1f}")
         print(f"  Avg text items: {metrics['avg_text_items']:.1f}")
@@ -184,9 +180,9 @@ def compare_providers(all_metrics: list[dict]) -> None:
 
     # Comparison table
     print("\n### Data Quality Matrix\n")
-    print(
-        f"{'Provider':<15} {'Samples':>8} {'Layout%':>8} {'Valid%':>8} {'Image%':>8} {'Text%':>8} {'Depth':>6} {'Nodes':>6}"
-    )
+    header = f"{'Provider':<15} {'Samples':>8} {'Layout%':>8} {'Valid%':>8} "
+    header += f"{'Image%':>8} {'Text%':>8} {'Depth':>6} {'Nodes':>6}"
+    print(header)
     print("-" * 80)
 
     for m in valid_metrics:
@@ -220,19 +216,17 @@ def compare_providers(all_metrics: list[dict]) -> None:
     # Assessment for Vector DB suitability
     print("\n### Vector DB Embedding Assessment\n")
 
-    total_layouts = sum(m["has_layout"] for m in valid_metrics)
+    _total_layouts = sum(m["has_layout"] for m in valid_metrics)
     total_valid = sum(m["layout_valid"] for m in valid_metrics)
     total_text = sum(m["has_text_content"] for m in valid_metrics)
     total_images = sum(m["screenshot_exists"] for m in valid_metrics)
     total_samples = sum(m["total"] for m in valid_metrics)
 
     print(f"Total samples across providers: {total_samples}")
-    print(
-        f"Total with valid LayoutNode: {total_valid} ({100 * total_valid / total_samples:.0f}%)"
-    )
-    print(
-        f"Total with text content: {total_text} ({100 * total_text / total_samples:.0f}%)"
-    )
+    valid_pct = 100 * total_valid / total_samples
+    print(f"Total with valid LayoutNode: {total_valid} ({valid_pct:.0f}%)")
+    text_pct = 100 * total_text / total_samples
+    print(f"Total with text content: {total_text} ({text_pct:.0f}%)")
     print(
         f"Total with images: {total_images} ({100 * total_images / total_samples:.0f}%)"
     )

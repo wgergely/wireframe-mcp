@@ -329,9 +329,13 @@ def _build_index_for_provider(
 
 def cmd_build_index(args: argparse.Namespace) -> int:
     """Handle the build index command."""
+    from src.config import get_index_dir
     from src.vector import BackendType, VectorStore
 
     try:
+        # Resolve output path
+        output_path = args.output if args.output else get_index_dir()
+
         # Determine backend
         backend_type = BackendType[args.backend.upper()]
 
@@ -340,7 +344,7 @@ def cmd_build_index(args: argparse.Namespace) -> int:
         logger.info("RAG Index Builder")
         logger.info("=" * 60)
         logger.info(f"Backend: {backend_type.value}")
-        logger.info(f"Output: {args.output}")
+        logger.info(f"Output: {output_path}")
         logger.info(f"Batch size: {args.batch_size}")
         if args.limit:
             logger.info(f"Limit per provider: {args.limit}")
@@ -416,8 +420,8 @@ def cmd_build_index(args: argparse.Namespace) -> int:
         logger.info("=" * 60)
 
         if total_indexed > 0:
-            store.save(args.output)
-            logger.info(f"Index saved to: {args.output}")
+            store.save(output_path)
+            logger.info(f"Index saved to: {output_path}")
         else:
             logger.warning("No items indexed, skipping save")
 
@@ -519,8 +523,8 @@ def handle_index_command(argv: list[str]) -> int:
         "--output",
         "-o",
         type=Path,
-        default=Path("data/index"),
-        help="Output directory for index (default: data/index)",
+        default=None,
+        help="Output directory for index (default: .corpus/index)",
     )
     build_parser.add_argument(
         "--backend",
@@ -581,12 +585,16 @@ def handle_index_command(argv: list[str]) -> int:
 
 def cmd_search_index(args: argparse.Namespace) -> int:
     """Handle the search command."""
+    from src.config import get_index_dir
     from src.vector import VectorStore
 
     try:
+        # Resolve index path
+        index_path = args.index if args.index else get_index_dir()
+
         # Load index
         store = VectorStore()
-        store.load(args.index)
+        store.load(index_path)
         logger.info(f"Loaded index with {len(store)} documents")
 
         # Search
@@ -626,8 +634,8 @@ def handle_search_command(argv: list[str]) -> int:
         "--index",
         "-i",
         type=Path,
-        default=Path("data/index"),
-        help="Index directory path (default: data/index)",
+        default=None,
+        help="Index directory path (default: .corpus/index)",
     )
     parser.add_argument(
         "--k",
@@ -884,7 +892,7 @@ def handle_corpus_command(argv: list[str]) -> int:
         "-o",
         type=Path,
         default=None,
-        help="Target data directory (default: ./data)",
+        help="Target data directory (default: .corpus/data)",
     )
     download_parser.add_argument(
         "--force",
@@ -939,15 +947,45 @@ def cmd_test(extra_args: list[str]) -> int:
 
 
 def cmd_build(extra_args: list[str]) -> int:
-    """Run docker compose commands."""
-    compose_file = Path("docker/docker-compose.yml")
-    if not compose_file.exists():
-        logger.error(f"Error: {compose_file} not found.")
+    """Run docker compose commands.
+
+    Usage:
+        python . build              # Build dev image
+        python . build up           # Start dev containers
+        python . build down         # Stop containers
+        python . build --prod up    # Start production containers
+        python . build --prod build # Build production image
+    """
+    docker_dir = Path("docker")
+    base_file = docker_dir / "docker-compose.yml"
+
+    if not base_file.exists():
+        logger.error(f"Error: {base_file} not found.")
+        return 1
+
+    # Check for --prod flag
+    mode = "dev"
+    if "--prod" in extra_args:
+        mode = "prod"
+        extra_args = [arg for arg in extra_args if arg != "--prod"]
+
+    override_file = docker_dir / f"docker-compose.{mode}.yml"
+    if not override_file.exists():
+        logger.error(f"Error: {override_file} not found.")
         return 1
 
     action = extra_args if extra_args else ["build"]
-    final_cmd = ["docker", "compose", "-f", str(compose_file), *action]
+    final_cmd = [
+        "docker",
+        "compose",
+        "-f",
+        str(base_file),
+        "-f",
+        str(override_file),
+        *action,
+    ]
 
+    logger.info(f"Mode: {mode}")
     logger.info(f"Running: {' '.join(final_cmd)}")
     try:
         return subprocess.call(final_cmd)
@@ -979,6 +1017,12 @@ def show_help() -> None:
     print("  python . corpus datasets             # List available providers")
     print("  python . corpus download rico_semantic")
     print("  python . test -v")
+    print("\nDocker commands:")
+    print("  python . build                       # Build dev image")
+    print("  python . build up                    # Start dev containers (hot reload)")
+    print("  python . build down                  # Stop containers")
+    print("  python . build --prod build          # Build production image")
+    print("  python . build --prod up -d          # Start production containers")
 
 
 def main() -> int:

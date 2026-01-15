@@ -116,7 +116,7 @@ class TestComponentLabelMapping:
     @pytest.mark.unit
     def test_label_maps_to_valid_component_type(self):
         """All mappings should produce valid ComponentType values."""
-        for label, comp_type in COMPONENT_LABEL_MAP.items():
+        for _label, comp_type in COMPONENT_LABEL_MAP.items():
             assert isinstance(comp_type, ComponentType)
 
 
@@ -133,7 +133,7 @@ class TestAndroidClassMapping:
     @pytest.mark.unit
     def test_class_maps_to_valid_component_type(self):
         """All mappings should produce valid ComponentType values."""
-        for class_name, comp_type in ANDROID_CLASS_MAP.items():
+        for _class_name, comp_type in ANDROID_CLASS_MAP.items():
             assert isinstance(comp_type, ComponentType)
 
 

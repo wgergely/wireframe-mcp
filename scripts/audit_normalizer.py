@@ -7,8 +7,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.corpus import CorpusManager  # noqa: E402
-from src.corpus.normalizer import (  # noqa: E402
+from src.corpus import CorpusManager
+from src.corpus.normalizer import (
     count_components,
     extract_text_content,
     node_count,
@@ -16,7 +16,7 @@ from src.corpus.normalizer import (  # noqa: E402
     normalize_rico_hierarchy,
     tree_depth,
 )
-from src.mid import validate_layout  # noqa: E402
+from src.mid import validate_layout
 
 
 def audit_normalization():
@@ -137,9 +137,8 @@ def audit_normalization():
         print(f"  Valid layouts: {enrico_results['valid']}")
         print(f"  Invalid layouts: {enrico_results['invalid']}")
         print(f"  Total nodes: {enrico_results['total_nodes']}")
-        print(
-            f"  Avg nodes/item: {enrico_results['total_nodes'] / enrico_results['total']:.1f}"
-        )
+        avg_nodes = enrico_results['total_nodes'] / enrico_results['total']
+        print(f"  Avg nodes/item: {avg_nodes:.1f}")
         print(f"  Max tree depth: {enrico_results['max_depth']}")
         print("  Component distribution:")
         for comp, count in sorted(

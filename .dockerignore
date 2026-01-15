@@ -17,6 +17,7 @@ ENV/
 .idea/
 *.swp
 *.swo
+*~
 
 # Git
 .git/
@@ -28,7 +29,7 @@ ENV/
 .agent/
 .claude/
 
-# Testing
+# Testing artifacts
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -36,19 +37,34 @@ ENV/
 htmlcov/
 pytestdebug.log
 
-# Documentation
-*.md
+# Documentation (keep README for prod image)
 docs/
 
-# Temporary and data files
+# Corpus data (mounted as volume, not copied)
+.corpus/
+
+# Temporary and output data
 data/
 .data/
 tmpclaude*/
+tmp*/
 
 # Build artifacts
 build/
 dist/
 *.egg-info/
 
-# Environment
+# Environment and secrets
 .env
+.env.*
+!.env.example
+
+# Docker artifacts (avoid recursive copy)
+docker/docker-compose*.yml
+
+# Scripts not needed in container
+scripts/
+
+# Windows artifacts
+Thumbs.db
+Desktop.ini

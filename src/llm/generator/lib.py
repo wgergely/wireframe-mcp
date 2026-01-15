@@ -127,6 +127,19 @@ OPTIONAL FIELDS:
 - orientation: layout direction (default: "vertical")
 - children: nested LayoutNode array
 
+LAYOUT PROPERTIES (optional - use for precise control):
+- align: cross-axis alignment ("start", "center", "end", "stretch")
+- justify: main-axis distribution ("start", "center", "end", "between", "around")
+- gap: spacing between children in pixels (integer)
+- padding: internal padding in pixels (integer)
+- wrap: overflow behavior ("none", "wrap")
+
+TEXT STYLING (optional - for text nodes):
+- text_size: size hierarchy ("title", "heading", "body", "caption")
+- text_weight: font weight ("light", "normal", "bold")
+- text_transform: case ("none", "uppercase", "lowercase", "capitalize")
+- text_align: alignment ("left", "center", "right")
+
 OUTPUT FORMAT: Single JSON object with root LayoutNode structure.
 Do not include any text before or after the JSON."""
 

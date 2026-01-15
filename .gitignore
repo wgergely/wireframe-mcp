@@ -4,6 +4,8 @@
 data/
 .data/
 .corpus/data/
+.corpus/index/
+.corpus/models/
 
 # tmpclaude
 tmpclaude*

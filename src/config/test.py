@@ -285,3 +285,76 @@ def test_get_corpus_dir_custom_subdir(tmp_path, monkeypatch):
 
     expected = repo_root / ".corpus" / "cache/embeddings"
     assert result == expected
+
+
+# Tests for get_index_dir
+
+
+@pytest.mark.unit
+def test_get_index_dir_with_override(tmp_path):
+    """Override parameter takes highest priority."""
+    from .lib import get_index_dir
+
+    custom_path = tmp_path / "custom_index"
+    result = get_index_dir(custom_path)
+
+    assert result == custom_path
+
+
+@pytest.mark.unit
+def test_get_index_dir_with_override_as_string(tmp_path):
+    """Override parameter accepts string paths."""
+    from .lib import get_index_dir
+
+    custom_path = tmp_path / "custom_index_str"
+    result = get_index_dir(str(custom_path))
+
+    assert result == custom_path
+
+
+@pytest.mark.unit
+def test_get_index_dir_with_env_var(tmp_path, monkeypatch):
+    """CORPUS_INDEX_DIR env var used when no override provided."""
+    from .lib import get_index_dir
+
+    env_path = tmp_path / "index_from_env"
+    monkeypatch.setenv("CORPUS_INDEX_DIR", str(env_path))
+
+    result = get_index_dir()
+
+    assert result == env_path
+
+
+@pytest.mark.unit
+def test_get_index_dir_override_beats_env_var(tmp_path, monkeypatch):
+    """Explicit override takes precedence over environment variable."""
+    from .lib import get_index_dir
+
+    env_path = tmp_path / "index_env"
+    override_path = tmp_path / "index_override"
+
+    monkeypatch.setenv("CORPUS_INDEX_DIR", str(env_path))
+    result = get_index_dir(override_path)
+
+    assert result == override_path
+
+
+@pytest.mark.unit
+def test_get_index_dir_default_finds_repo_root(tmp_path, monkeypatch):
+    """Default behavior finds repo root and returns .corpus/index."""
+    from .lib import get_index_dir
+
+    repo_root = tmp_path / "fake_repo_index"
+    repo_root.mkdir()
+    (repo_root / ".gitignore").touch()
+
+    subdir = repo_root / "src" / "submodule"
+    subdir.mkdir(parents=True)
+
+    monkeypatch.chdir(subdir)
+    monkeypatch.delenv("CORPUS_INDEX_DIR", raising=False)
+
+    result = get_index_dir()
+
+    expected = repo_root / ".corpus" / "index"
+    assert result == expected

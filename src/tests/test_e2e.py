@@ -286,9 +286,8 @@ class TestRAGEnhancedPipeline:
         result = generator.generate(query)
 
         # CRITICAL: Verify RAG was used
-        assert result.prompt_context.example_count > 0, (
-            f"RAG examples should be included. Got {result.prompt_context.example_count}"
-        )
+        rag_count = result.prompt_context.example_count
+        assert rag_count > 0, f"RAG examples should be included. Got {rag_count}"
         assert len(result.prompt_context.example_ids) > 0, (
             "Should have example IDs from RAG retrieval"
         )

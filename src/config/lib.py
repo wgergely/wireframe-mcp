@@ -3,12 +3,17 @@
 Provides centralized path resolution for all corpus-related storage:
 - Data directory: corpus datasets
 - Models directory: embedding models
-- Index directory: vector indices (future)
+- Index directory: vector indices
 
 All paths follow the same resolution priority:
 1. Explicit override parameter
 2. Environment variable (CORPUS_{NAME}_DIR)
 3. {repo_root}/.corpus/{subdir}
+
+Environment Variables:
+    CORPUS_DATA_DIR: Override data directory ({repo_root}/.corpus/data).
+    CORPUS_MODELS_DIR: Override models directory ({repo_root}/.corpus/models).
+    CORPUS_INDEX_DIR: Override index directory ({repo_root}/.corpus/index).
 """
 
 import os
@@ -132,4 +137,21 @@ def get_models_dir(override: Path | str | None = None) -> Path:
     return get_corpus_dir("models", "CORPUS_MODELS_DIR", override)
 
 
-__all__ = ["get_corpus_dir", "get_data_dir", "get_models_dir"]
+def get_index_dir(override: Path | str | None = None) -> Path:
+    """Get vector index directory.
+
+    Resolution priority:
+        1. Explicit override parameter
+        2. CORPUS_INDEX_DIR environment variable
+        3. {repo_root}/.corpus/index
+
+    Args:
+        override: Optional path override.
+
+    Returns:
+        Resolved Path to index directory.
+    """
+    return get_corpus_dir("index", "CORPUS_INDEX_DIR", override)
+
+
+__all__ = ["get_corpus_dir", "get_data_dir", "get_index_dir", "get_models_dir"]

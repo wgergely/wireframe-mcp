@@ -48,6 +48,9 @@ exclude = [
 select = ["E", "F", "B", "I"]
 ignore = []
 
+# Per-file rule ignores
+per-file-ignores = { "scripts/*.py" = ["E402", "F841"] }
+
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 unfixable = []

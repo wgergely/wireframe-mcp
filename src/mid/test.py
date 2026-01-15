@@ -3,12 +3,63 @@
 import pytest
 
 from src.mid import (
+    Alignment,
     ComponentType,
+    Justify,
     LayoutNode,
     Orientation,
+    TextSize,
+    TextWeight,
+    Wrap,
     export_json_schema,
     validate_layout,
 )
+
+
+class TestLayoutEnums:
+    """Tests for layout control enums."""
+
+    @pytest.mark.unit
+    def test_alignment_values(self):
+        """All expected alignment values exist."""
+        assert Alignment.START.value == "start"
+        assert Alignment.CENTER.value == "center"
+        assert Alignment.END.value == "end"
+        assert Alignment.STRETCH.value == "stretch"
+
+    @pytest.mark.unit
+    def test_justify_values(self):
+        """All expected justify values exist."""
+        assert Justify.START.value == "start"
+        assert Justify.CENTER.value == "center"
+        assert Justify.END.value == "end"
+        assert Justify.BETWEEN.value == "between"
+        assert Justify.AROUND.value == "around"
+
+    @pytest.mark.unit
+    def test_wrap_values(self):
+        """All expected wrap values exist."""
+        assert Wrap.NONE.value == "none"
+        assert Wrap.WRAP.value == "wrap"
+
+
+class TestTextStylingEnums:
+    """Tests for text styling enums."""
+
+    @pytest.mark.unit
+    def test_text_size_values(self):
+        """All expected text size values exist."""
+        assert TextSize.TITLE.value == "title"
+        assert TextSize.HEADING.value == "heading"
+        assert TextSize.BODY.value == "body"
+        assert TextSize.CAPTION.value == "caption"
+
+    @pytest.mark.unit
+    def test_text_weight_values(self):
+        """All expected text weight values exist."""
+        assert TextWeight.LIGHT.value == "light"
+        assert TextWeight.NORMAL.value == "normal"
+        assert TextWeight.BOLD.value == "bold"
 
 
 class TestOrientation:

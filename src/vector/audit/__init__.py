@@ -4,7 +4,9 @@ Provides infrastructure to define test queries with expected results,
 run them against a VectorStore, and evaluate search quality.
 
 Example:
-    >>> from src.vector.audit import AuditRunner, AuditQuery, ExpectedCriteria, MatchCriterion
+    >>> from src.vector.audit import (
+    ...     AuditRunner, AuditQuery, ExpectedCriteria, MatchCriterion,
+    ... )
     >>> runner = AuditRunner(vector_store)
     >>> query = AuditQuery(
     ...     query="login form with email",

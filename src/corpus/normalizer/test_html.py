@@ -28,7 +28,10 @@ class TestParseHtmlToHierarchy:
     @pytest.mark.unit
     def test_extracts_body(self):
         """Parser extracts body content."""
-        html = "<html><head><title>Test</title></head><body><div>Content</div></body></html>"
+        html = (
+            "<html><head><title>Test</title></head>"
+            "<body><div>Content</div></body></html>"
+        )
         hierarchy = parse_html_to_hierarchy(html)
 
         assert hierarchy["tag"] == "body"
@@ -45,7 +48,10 @@ class TestParseHtmlToHierarchy:
     @pytest.mark.unit
     def test_extracts_attributes(self):
         """Important attributes are extracted."""
-        html = '<input type="text" placeholder="Enter name" id="name-input" class="form-control">'
+        html = (
+            '<input type="text" placeholder="Enter name" '
+            'id="name-input" class="form-control">'
+        )
         hierarchy = parse_html_to_hierarchy(html)
 
         assert hierarchy["input_type"] == "text"

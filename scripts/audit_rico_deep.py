@@ -7,7 +7,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.corpus import CorpusManager  # noqa: E402
+from src.corpus import CorpusManager
 
 
 def count_component_labels(node: dict, depth: int = 0) -> dict:
@@ -60,7 +60,7 @@ def audit_hierarchy_structure():
     # Analyze hierarchy structure
     root_has_label = 0
     total_labels_in_tree = 0
-    max_depth = 0
+    _max_depth = 0  # Track maximum depth (unused for now)
 
     for item in items:
         hierarchy = item.hierarchy
@@ -86,7 +86,7 @@ def audit_hierarchy_structure():
         prefix = "  " * indent
         label = node.get("componentLabel", "<no label>")
         cls = node.get("class", "<no class>").split(".")[-1]
-        bounds = node.get("bounds", [])
+        _bounds = node.get("bounds", [])
         text = node.get("text", "")
         text_preview = f' text="{text[:20]}..."' if text else ""
 

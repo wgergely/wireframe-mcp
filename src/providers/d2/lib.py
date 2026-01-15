@@ -19,11 +19,14 @@ class D2Provider(LayoutProvider):
         - Nested containers with `{ }` blocks
         - Direction control via `direction: right/down`
         - Width hints via `width: N%`
+        - Style hints via comments for align, justify, gap, padding
+        - Text styling hints via comments
 
     Example output:
         ```d2
         root: Dashboard {
           direction: right
+          # layout: align=center, justify=between, gap=16
 
           sidebar: Navigation {
             width: 25%
@@ -83,6 +86,16 @@ class D2Provider(LayoutProvider):
             width_pct = self._flex_to_percentage(node.flex_ratio)
             lines.append(f"{prefix}  width: {width_pct}%")
 
+        # Layout properties as D2 style hints
+        layout_hints = self._build_layout_hints(node)
+        if layout_hints:
+            lines.append(f"{prefix}  # layout: {layout_hints}")
+
+        # Text styling as D2 style hints
+        text_hints = self._build_text_hints(node)
+        if text_hints:
+            lines.append(f"{prefix}  # text: {text_hints}")
+
         # Recurse into children
         for child in node.children:
             lines.append("")  # Blank line between children
@@ -90,6 +103,34 @@ class D2Provider(LayoutProvider):
 
         lines.append(f"{prefix}}}")
         return "\n".join(lines)
+
+    def _build_layout_hints(self, node: LayoutNode) -> str:
+        """Build layout hints string from node properties."""
+        hints = []
+        if node.align:
+            hints.append(f"align={node.align}")
+        if node.justify:
+            hints.append(f"justify={node.justify}")
+        if node.gap is not None:
+            hints.append(f"gap={node.gap}")
+        if node.padding is not None:
+            hints.append(f"padding={node.padding}")
+        if node.wrap:
+            hints.append(f"wrap={node.wrap}")
+        return ", ".join(hints)
+
+    def _build_text_hints(self, node: LayoutNode) -> str:
+        """Build text styling hints string from node properties."""
+        hints = []
+        if node.text_size:
+            hints.append(f"size={node.text_size}")
+        if node.text_weight:
+            hints.append(f"weight={node.text_weight}")
+        if node.text_transform:
+            hints.append(f"transform={node.text_transform}")
+        if node.text_align:
+            hints.append(f"align={node.text_align}")
+        return ", ".join(hints)
 
     def _escape_label(self, label: str) -> str:
         """Escape D2 special chars by quoting."""

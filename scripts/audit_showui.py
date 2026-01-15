@@ -7,7 +7,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.corpus import CorpusManager  # noqa: E402
+from src.corpus import CorpusManager
 
 
 def audit_showui_pipeline():

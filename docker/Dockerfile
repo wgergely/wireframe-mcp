@@ -2,7 +2,7 @@
 
 # ============================================================================
 # wireframe-mcp Docker Image
-# Multi-stage build for the MCP server with CUDA 12+ and Python 3.12 support
+# Multi-stage build with dev/prod targets for CUDA 12+ and Python 3.12
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -47,53 +47,95 @@ FROM base AS builder
 # Copy dependency files
 COPY pyproject.toml requirements.txt ./
 
-# Install Python dependencies (including faiss-gpu)
-# Note: faiss-gpu wheels often ship with their own CUDA libs, but we have system CUDA here too.
-# We trust pip to resolve the compatible wheel.
+# Install Python dependencies
+# Note: faiss-gpu wheels ship with CUDA libs; we trust pip to resolve compatibility
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir -e .
 
 # ----------------------------------------------------------------------------
-# Runtime stage: Final image
+# Development target: Hot reloading support
+# Source code mounted as volume, not copied into image
 # ----------------------------------------------------------------------------
-FROM base AS runtime
+FROM base AS dev
 
-# Create non-root user for security (although accessing /dev/nvidia might require specific groups in some runtimes)
+# Create non-root user
 RUN groupadd --gid 1000 mcp \
     && useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home mcp
 
 # Copy installed packages from builder
-# We find where site-packages are located for python 3.12
 COPY --from=builder /usr/local/lib/python3.12/dist-packages /usr/local/lib/python3.12/dist-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY src/ ./src/
+# Copy only pyproject.toml (source mounted at runtime)
 COPY pyproject.toml ./
 
-# Create directories for corpus data and config
-RUN mkdir -p /app/corpus /app/config \
+# Create directories for runtime data
+RUN mkdir -p /app/corpus/data /app/corpus/models /app/config /app/data /app/src \
     && chown -R mcp:mcp /app
 
 # Switch to non-root user
 USER mcp
 
-# Volume mount points
-VOLUME ["/app/corpus", "/app/config"]
+# Volume mount points for persistent data
+VOLUME ["/app/corpus", "/app/config", "/app/data"]
 
-# Environment variables for MCP configuration
+# Environment variables
 ENV MCP_HOST=0.0.0.0 \
     MCP_PORT=8080 \
     CORPUS_PATH=/app/corpus \
+    CORPUS_DATA_DIR=/app/corpus/data \
+    CORPUS_MODELS_DIR=/app/corpus/models \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# Expose MCP server port
 EXPOSE 8080
 
-# Healthcheck
+# Dev mode: run with python -u for unbuffered output
+ENTRYPOINT ["python", "-u"]
+CMD ["-m", "src"]
+
+# ----------------------------------------------------------------------------
+# Production target: Optimized runtime image
+# Source code copied into image for deployment
+# ----------------------------------------------------------------------------
+FROM base AS prod
+
+# Create non-root user
+RUN groupadd --gid 1000 mcp \
+    && useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home mcp
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.12/dist-packages /usr/local/lib/python3.12/dist-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY src/ ./src/
+COPY __main__.py pyproject.toml ./
+
+# Create directories for runtime data
+RUN mkdir -p /app/corpus/data /app/corpus/models /app/config /app/data \
+    && chown -R mcp:mcp /app
+
+# Switch to non-root user
+USER mcp
+
+# Volume mount points for persistent data
+VOLUME ["/app/corpus", "/app/config", "/app/data"]
+
+# Environment variables
+ENV MCP_HOST=0.0.0.0 \
+    MCP_PORT=8080 \
+    CORPUS_PATH=/app/corpus \
+    CORPUS_DATA_DIR=/app/corpus/data \
+    CORPUS_MODELS_DIR=/app/corpus/models \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+EXPOSE 8080
+
+# Healthcheck validates core module imports
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "from src import list_providers; list_providers()" || exit 1
 
-# Default entrypoint
-ENTRYPOINT ["python", "-m", "src"]
+ENTRYPOINT ["python"]
+CMD ["-m", "src"]
