@@ -11,12 +11,15 @@ Example usage:
 
 from .lib import (
     COMPONENT_CATEGORIES,
+    AlignContent,
     Alignment,
+    AlignSelf,
     ComponentCategory,
     ComponentType,
     Justify,
     LayoutNode,
     Orientation,
+    SemanticColor,
     TextAlign,
     TextSize,
     TextTransform,
@@ -32,6 +35,8 @@ from .lib import (
 __all__ = [
     # Layout enums
     "Alignment",
+    "AlignContent",
+    "AlignSelf",
     "Justify",
     "Orientation",
     "Wrap",
@@ -40,6 +45,7 @@ __all__ = [
     "TextSize",
     "TextTransform",
     "TextWeight",
+    "SemanticColor",
     # Component enums
     "ComponentType",
     "ComponentCategory",

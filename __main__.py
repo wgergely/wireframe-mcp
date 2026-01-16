@@ -937,9 +937,46 @@ def handle_corpus_command(argv: list[str]) -> int:
 
 
 def cmd_test(extra_args: list[str]) -> int:
-    """Run pytest with provided arguments."""
-    cmd = [sys.executable, "-m", "pytest", *extra_args]
+    """Run pytest with provided arguments and test tier options.
+
+    Usage:
+        python . test                # Run all tests
+        python . test --unit         # Run only unit tests (fast, no dependencies)
+        python . test --integration  # Run integration tests (file/network, no Docker)
+        python . test --docker       # Run Docker-dependent tests (requires Kroki)
+        python . test --all          # Run all tests explicitly
+        python . test -v             # Run with verbose output
+        python . test -k "search"    # Run tests matching pattern
+
+    Test Tiers:
+        unit        - Fast tests with no I/O or external dependencies
+        integration - Tests requiring file system, network, or external APIs
+        docker      - Tests requiring Docker services (Kroki, etc.)
+        rag         - Tests requiring vector index (auto-built if missing)
+    """
+    # Test tier mapping
+    tier_markers = {
+        "--unit": ["-m", "unit"],
+        "--integration": ["-m", "integration and not docker"],
+        "--docker": ["-m", "docker or kroki"],
+        "--rag": ["-m", "rag"],
+        "--all": [],  # No filter, run everything
+    }
+
+    # Process tier flags
+    pytest_args: list[str] = []
+    remaining_args: list[str] = []
+
+    for arg in extra_args:
+        if arg in tier_markers:
+            pytest_args.extend(tier_markers[arg])
+        else:
+            remaining_args.append(arg)
+
+    # Build final command
+    cmd = [sys.executable, "-m", "pytest", *pytest_args, *remaining_args]
     logger.info(f"Running: {' '.join(cmd)}")
+
     try:
         return subprocess.call(cmd)
     except KeyboardInterrupt:

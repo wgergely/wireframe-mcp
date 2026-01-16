@@ -1,5 +1,7 @@
 """Tests for Docker module."""
 
+import pytest
+
 from docker import (
     CONFIG_PATH,
     CORPUS_DATA_PATH,
@@ -12,6 +14,7 @@ from docker import (
 from docker.lib import get_container_path
 
 
+@pytest.mark.unit
 class TestDockerConstants:
     """Test Docker configuration constants."""
 
@@ -32,6 +35,7 @@ class TestDockerConstants:
         assert str(CONFIG_PATH) == "/app/config"
 
 
+@pytest.mark.unit
 class TestGetContainerPath:
     """Test container path utility function."""
 
@@ -51,6 +55,7 @@ class TestGetContainerPath:
         assert result == "/app/corpus/data/models/v2/index.json"
 
 
+@pytest.mark.unit
 class TestListModes:
     """Test available docker-compose modes."""
 
@@ -71,6 +76,7 @@ class TestListModes:
         assert modes == sorted(modes)
 
 
+@pytest.mark.unit
 class TestListBackends:
     """Test available docker-compose backends."""
 
@@ -90,6 +96,7 @@ class TestListBackends:
         assert backends == sorted(backends)
 
 
+@pytest.mark.unit
 class TestGetComposeFiles:
     """Test compose file composition logic."""
 

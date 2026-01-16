@@ -14,7 +14,9 @@ Example usage:
 
 from .lib import (
     COMPONENT_REGISTRY,
+    AlignContent,
     Alignment,
+    AlignSelf,
     ComponentCategory,
     ComponentConstraints,
     ComponentMeta,
@@ -23,6 +25,7 @@ from .lib import (
     LayoutNodeSchema,
     Orientation,
     SchemaValidationError,
+    SemanticColor,
     TextAlign,
     TextSize,
     TextTransform,
@@ -44,6 +47,8 @@ from .lib import (
 
 __all__ = [
     # Enums - Layout
+    "AlignContent",
+    "AlignSelf",
     "Alignment",
     "ComponentCategory",
     "ComponentType",
@@ -54,7 +59,9 @@ __all__ = [
     "TextAlign",
     "TextSize",
     "TextTransform",
+    "TextTransform",
     "TextWeight",
+    "SemanticColor",
     # Metadata
     "ComponentConstraints",
     "ComponentMeta",

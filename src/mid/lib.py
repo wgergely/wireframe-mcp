@@ -20,11 +20,14 @@ from pydantic import BaseModel, Field
 # Import authoritative definitions from schema module
 from src.schema import (
     COMPONENT_REGISTRY,
+    AlignContent,
     Alignment,
+    AlignSelf,
     ComponentCategory,
     ComponentType,
     Justify,
     Orientation,
+    SemanticColor,
     TextAlign,
     TextSize,
     TextTransform,
@@ -79,6 +82,14 @@ class LayoutNode(BaseModel):
         default=1,
         description="Grid span ratio (1-12 standard grid system)",
     )
+    width: int | str | None = Field(
+        default=None,
+        description="Fixed width (px) or relative ('100%', 'auto')",
+    )
+    height: int | str | None = Field(
+        default=None,
+        description="Fixed height (px) or relative ('100%', 'auto')",
+    )
     orientation: Orientation = Field(
         default=Orientation.VERTICAL,
         description="Layout flow direction for immediate children",
@@ -93,6 +104,10 @@ class LayoutNode(BaseModel):
         default=None,
         description="Main-axis distribution (justify-content)",
     )
+    align_content: AlignContent | None = Field(
+        default=None,
+        description="Multi-line cross-axis alignment (align-content)",
+    )
     gap: Annotated[int, Field(ge=0)] | None = Field(
         default=None,
         description="Spacing between children in pixels",
@@ -104,6 +119,12 @@ class LayoutNode(BaseModel):
     padding: Annotated[int, Field(ge=0)] | None = Field(
         default=None,
         description="Internal padding in pixels",
+    )
+
+    # Layout - Flex Item behavior
+    align_self: AlignSelf | None = Field(
+        default=None,
+        description="Self alignment override (align-self)",
     )
 
     # Text styling
@@ -122,6 +143,18 @@ class LayoutNode(BaseModel):
     text_align: TextAlign | None = Field(
         default=None,
         description="Horizontal text alignment",
+    )
+
+    # Visual Styling
+    semantic_color: SemanticColor | None = Field(
+        default=None,
+        description="Semantic color status (e.g. primary, danger)",
+    )
+
+    # Interactive/Container props
+    scrollable: bool = Field(
+        default=False,
+        description="Whether the container has overflow scrolling",
     )
 
     model_config = {
@@ -170,6 +203,9 @@ def validate_layout(node: LayoutNode) -> list[ValidationError]:
     id_counts: dict[str, int] = {}
     visited: set[int] = set()
 
+    # Import constraint getter
+    from src.schema import get_constraints
+
     def visit(n: LayoutNode, path: set[int]) -> None:
         # Check for duplicate IDs
         id_counts[n.id] = id_counts.get(n.id, 0) + 1
@@ -195,6 +231,73 @@ def validate_layout(node: LayoutNode) -> list[ValidationError]:
                     error_type="invalid_flex_ratio",
                 )
             )
+
+        # Check Component Constraints
+        try:
+            # Handle Pydantic use_enum_values=True (n.type might be str)
+            comp_type = n.type
+            if isinstance(comp_type, str):
+                comp_type = ComponentType(comp_type)
+
+            constraints = get_constraints(comp_type)
+
+            # 1. Check can_have_children
+            if not constraints.can_have_children and n.children:
+                errors.append(
+                    ValidationError(
+                        node_id=n.id,
+                        message=(
+                            f"Component '{comp_type.value}' cannot have "
+                            f"children (found {len(n.children)})"
+                        ),
+                        error_type="constraint_violation",
+                    )
+                )
+
+            # 2. Check max_children
+            if (
+                constraints.max_children is not None
+                and len(n.children) > constraints.max_children
+            ):
+                errors.append(
+                    ValidationError(
+                        node_id=n.id,
+                        message=(
+                            f"Component '{comp_type.value}' exceeds "
+                            f"max_children {constraints.max_children} "
+                            f"(found {len(n.children)})"
+                        ),
+                        error_type="constraint_violation",
+                    )
+                )
+
+            # 3. Check allowed_child_types
+            if constraints.allowed_child_types:
+                for child in n.children:
+                    # Convert child type to enum for comparison
+                    child_type = child.type
+                    if isinstance(child_type, str):
+                        child_type = ComponentType(child_type)
+
+                    if child_type not in constraints.allowed_child_types:
+                        errors.append(
+                            ValidationError(
+                                node_id=n.id,
+                                message=(
+                                    f"Component '{comp_type.value}' cannot "
+                                    f"contain child type '{child_type.value}'"
+                                ),
+                                error_type="constraint_violation",
+                            )
+                        )
+
+            # 4. Check required_child_types (optional, not strictly enforced
+            # by schema yet but good for future)
+            # if constraints.required_child_types: ...
+
+        except KeyError:
+            # Component type not in registry (shouldn't happen with valid Enum)
+            pass
 
         if obj_id in visited:
             return
@@ -236,6 +339,11 @@ def is_valid(node: LayoutNode) -> bool:
 __all__ = [
     # Re-exported from schema (for backward compatibility)
     "Orientation",
+    "Alignment",
+    "AlignSelf",
+    "AlignContent",
+    "Justify",
+    "Wrap",
     "ComponentType",
     "ComponentCategory",
     "COMPONENT_CATEGORIES",

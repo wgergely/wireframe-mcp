@@ -4,6 +4,11 @@ Unit tests are mocked (no network).
 Integration tests require a running Kroki container.
 """
 
+import base64
+import zlib
+from dataclasses import dataclass
+
+import httpx
 import pytest
 
 from src.render import (
@@ -107,12 +112,11 @@ class TestRenderClientEncoding:
         """Encode produces valid base64 URL-safe string."""
         client = RenderClient()
         encoded = client._encode_diagram("test diagram")
-        # Should be URL-safe base64
-        assert "-" not in encoded or "_" in encoded or encoded.isalnum()
-        # Should be decodable
-        import base64
-        import zlib
 
+        # Should be URL-safe base64 (only alphanumeric, - and _)
+        assert all(c.isalnum() or c in "-_=" for c in encoded)
+
+        # Should be decodable back to original
         decoded = zlib.decompress(base64.urlsafe_b64decode(encoded))
         assert decoded == b"test diagram"
 
@@ -181,13 +185,13 @@ class TestPlantUMLOptionInjection:
         assert "scale 1.5" in result
 
 
+@dataclass
 class MockResponse:
     """Mock HTTP response for testing."""
 
-    def __init__(self, status_code: int, content: bytes = b"", text: str = ""):
-        self.status_code = status_code
-        self.content = content
-        self.text = text
+    status_code: int
+    content: bytes = b""
+    text: str = ""
 
 
 class TestRenderClientMocked:
@@ -207,8 +211,6 @@ class TestRenderClientMocked:
     @pytest.mark.unit
     def test_is_available_failure(self, monkeypatch):
         """is_available returns False on connection error."""
-        import httpx
-
         client = RenderClient()
 
         def mock_get(*args, **kwargs):
@@ -275,8 +277,8 @@ class TestRenderClientIntegration:
 
     @pytest.mark.kroki
     @pytest.mark.integration
-    def test_render_d2_png(self, kroki_client):
-        """Render D2 diagram to PNG."""
+    def test_render_d2_default(self, kroki_client):
+        """Render D2 diagram to SVG (Kroki D2 only supports SVG output)."""
         dsl = """
         root: Dashboard {
           direction: right
@@ -284,10 +286,11 @@ class TestRenderClientIntegration:
           main: Content { }
         }
         """
-        result = kroki_client.render(dsl, "d2")
+        config = RenderConfig(output_format=OutputFormat.SVG)
+        result = kroki_client.render(dsl, "d2", config)
 
-        assert result.image_bytes[:8] == b"\x89PNG\r\n\x1a\n"
-        assert result.format == OutputFormat.PNG
+        assert b"<svg" in result.image_bytes
+        assert result.format == OutputFormat.SVG
         assert result.size_bytes > 100
 
     @pytest.mark.kroki
@@ -303,13 +306,13 @@ class TestRenderClientIntegration:
     @pytest.mark.kroki
     @pytest.mark.integration
     def test_render_d2_with_theme(self, kroki_client):
-        """Render D2 diagram with terminal theme."""
+        """Render D2 diagram with terminal theme (SVG output)."""
         config = RenderConfig(
-            output_format=OutputFormat.PNG,
+            output_format=OutputFormat.SVG,
             theme=D2Theme.TERMINAL,
         )
         result = kroki_client.render("root: Test { }", "d2", config)
-        assert result.image_bytes[:8] == b"\x89PNG\r\n\x1a\n"
+        assert b"<svg" in result.image_bytes
 
     @pytest.mark.kroki
     @pytest.mark.integration
@@ -341,7 +344,7 @@ class TestRenderClientIntegration:
     @pytest.mark.kroki
     @pytest.mark.integration
     def test_render_layout_d2(self, kroki_client):
-        """Render LayoutNode via D2 provider."""
+        """Render LayoutNode via D2 provider (SVG output)."""
         from src.mid import ComponentType, LayoutNode, Orientation
 
         node = LayoutNode(
@@ -355,8 +358,9 @@ class TestRenderClientIntegration:
             ],
         )
 
-        result = kroki_client.render_layout(node, "d2")
-        assert result.image_bytes[:8] == b"\x89PNG\r\n\x1a\n"
+        config = RenderConfig(output_format=OutputFormat.SVG)
+        result = kroki_client.render_layout(node, "d2", config)
+        assert b"<svg" in result.image_bytes
         assert result.size_bytes > 100
 
     @pytest.mark.kroki

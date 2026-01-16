@@ -13,8 +13,8 @@ from typing import Any, Literal
 
 import httpx
 
-from src.ir import LayoutNode
-from src.providers import get_provider
+from ..ir import LayoutNode
+from ..providers import get_provider
 
 
 class OutputFormat(Enum):
@@ -343,11 +343,13 @@ class RenderClient:
         Returns:
             Modified DSL code with injected options.
         """
-        if diagram_type.lower() == "d2":
-            return self._inject_d2_options(dsl_code, config)
-        elif diagram_type.lower() in ("plantuml", "puml"):
-            return self._inject_plantuml_options(dsl_code, config)
-        return dsl_code
+        match diagram_type.lower():
+            case "d2":
+                return self._inject_d2_options(dsl_code, config)
+            case "plantuml" | "puml":
+                return self._inject_plantuml_options(dsl_code, config)
+            case _:
+                return dsl_code
 
     def _inject_d2_options(self, dsl_code: str, config: RenderConfig) -> str:
         """Inject D2-specific rendering options.
@@ -356,15 +358,12 @@ class RenderClient:
         """
         options: list[str] = []
 
-        # Theme
-        if config.theme and isinstance(config.theme, D2Theme):
+        if isinstance(config.theme, D2Theme):
             options.append(f"# d2-config: --theme {config.theme.value}")
 
-        # Sketch mode
         if config.sketch:
             options.append("# d2-config: --sketch")
 
-        # Scale/size (D2 uses --scale flag)
         if config.scale != 1.0:
             options.append(f"# d2-config: --scale {config.scale}")
 
@@ -375,24 +374,19 @@ class RenderClient:
     def _inject_plantuml_options(self, dsl_code: str, config: RenderConfig) -> str:
         """Inject PlantUML-specific rendering options.
 
-        PlantUML options are specified via !theme directive.
+        PlantUML options are specified via !theme directive after @start.
         """
-        # Find @startsalt or @startuml to inject after
         injections: list[str] = []
 
-        # Theme
-        if config.theme and isinstance(config.theme, PlantUMLTheme):
-            if config.theme.value:
-                injections.append(f"!theme {config.theme.value}")
+        if isinstance(config.theme, PlantUMLTheme) and config.theme.value:
+            injections.append(f"!theme {config.theme.value}")
 
-        # Scale
         if config.scale != 1.0:
             injections.append(f"scale {config.scale}")
 
         if not injections:
             return dsl_code
 
-        # Inject after @start directive
         lines = dsl_code.split("\n")
         result: list[str] = []
         injected = False

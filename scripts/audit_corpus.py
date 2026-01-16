@@ -138,16 +138,16 @@ def audit_provider(manager: CorpusManager, provider_name: str, limit: int = 50) 
     total = metrics["total"]
     if total > 0:
         print(f"\n  Samples analyzed: {total}")
-        hier_pct = 100 * metrics['has_hierarchy'] / total
+        hier_pct = 100 * metrics["has_hierarchy"] / total
         print(f"  Hierarchy: {metrics['has_hierarchy']}/{total} ({hier_pct:.0f}%)")
-        layout_pct = 100 * metrics['has_layout'] / total
+        layout_pct = 100 * metrics["has_layout"] / total
         print(f"  Layout: {metrics['has_layout']}/{total} ({layout_pct:.0f}%)")
-        valid_pct = 100 * metrics['layout_valid'] / total
+        valid_pct = 100 * metrics["layout_valid"] / total
         print(f"  Layout valid: {metrics['layout_valid']}/{total} ({valid_pct:.0f}%)")
-        scrn_pct = 100 * metrics['screenshot_exists'] / total
-        sc_cnt = metrics['screenshot_exists']
+        scrn_pct = 100 * metrics["screenshot_exists"] / total
+        sc_cnt = metrics["screenshot_exists"]
         print(f"  Screenshots: {sc_cnt}/{total} ({scrn_pct:.0f}%)")
-        text_pct = 100 * metrics['has_text_content'] / total
+        text_pct = 100 * metrics["has_text_content"] / total
         print(f"  Has text: {metrics['has_text_content']}/{total} ({text_pct:.0f}%)")
         print(f"\n  Avg tree depth: {metrics['avg_tree_depth']:.1f}")
         print(f"  Avg node count: {metrics['avg_node_count']:.1f}")

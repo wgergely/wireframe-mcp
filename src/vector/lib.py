@@ -500,15 +500,24 @@ class VectorStore:
         """
         path = Path(path)
 
-        # Load FAISS index
-        self._index = FAISSIndex.load(path)
-
-        # Load metadata
+        # Load metadata first to get backend type
         meta_path = path.with_suffix(".store.json")
         if meta_path.exists():
             with open(meta_path) as f:
                 data = json.load(f)
                 self._metadata = data.get("metadata", {})
+
+                # Restore backend from saved metadata
+                saved_backend = data.get("backend", "")
+                if saved_backend:
+                    # Parse backend type (e.g., "local:all-MiniLM-L6-v2" -> "local")
+                    backend_type = saved_backend.split(":")[0]
+                    if backend_type in [b.value for b in BackendType]:
+                        self._backend = self._create_backend(backend_type)
+                        logger.info(f"Restored backend: {backend_type}")
+
+        # Load FAISS index
+        self._index = FAISSIndex.load(path)
 
         self._index_path = path
         logger.info(f"Loaded VectorStore from {path}")

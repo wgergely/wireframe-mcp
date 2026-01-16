@@ -72,6 +72,45 @@ class Justify(str, Enum):
     END = "end"
     BETWEEN = "between"
     AROUND = "around"
+    EVENLY = "evenly"
+
+
+class AlignContent(str, Enum):
+    """Multi-line cross-axis alignment (CSS align-content).
+
+    Controls how lines align in a multi-line flex container:
+    - START: Pack lines at start
+    - CENTER: Pack lines at center
+    - END: Pack lines at end
+    - BETWEEN: Distribute lines with space between
+    - AROUND: Distribute lines with space around
+    - STRETCH: Stretch lines to fill container
+    """
+
+    START = "start"
+    CENTER = "center"
+    END = "end"
+    BETWEEN = "between"
+    AROUND = "around"
+    STRETCH = "stretch"
+
+
+class AlignSelf(str, Enum):
+    """Item-specific cross-axis alignment (CSS align-self).
+
+    Overrides the container's align-items value for a specific child:
+    - AUTO: Inherit from container
+    - START: Align to start edge
+    - CENTER: Center along cross-axis
+    - END: Align to end edge
+    - STRETCH: Stretch to fill container
+    """
+
+    AUTO = "auto"
+    START = "start"
+    CENTER = "center"
+    END = "end"
+    STRETCH = "stretch"
 
 
 class Wrap(str, Enum):
@@ -122,6 +161,18 @@ class TextAlign(str, Enum):
     RIGHT = "right"
 
 
+class SemanticColor(str, Enum):
+    """Semantic color palette for wireframe elements."""
+
+    DEFAULT = "default"
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    SUCCESS = "success"
+    WARNING = "warning"
+    DANGER = "danger"
+    INFO = "info"
+
+
 class ComponentType(str, Enum):
     """Rico-based UI component taxonomy (26 categories).
 
@@ -143,11 +194,16 @@ class ComponentType(str, Enum):
     TAB_BAR = "tab_bar"
     MULTI_TAB = "multi_tab"
     PAGER_INDICATOR = "pager_indicator"
+    MENU_BAR = "menu_bar"
+    TREE = "tree"
 
     # Content
     TEXT = "text"
     IMAGE = "image"
+
     LIST_ITEM = "list_item"
+    DATA_GRID = "data_grid"
+    DIVIDER = "divider"
     ICON = "icon"
     ADVERTISEMENT = "advertisement"
 
@@ -227,6 +283,10 @@ _CONTROL_CONSTRAINTS = ComponentConstraints(
 # Container constraints (horizontal by default)
 _HORIZONTAL_CONTAINER = ComponentConstraints(
     default_orientation=Orientation.HORIZONTAL,
+)
+
+_VERTICAL_CONTAINER = ComponentConstraints(
+    default_orientation=Orientation.VERTICAL,
 )
 
 # Navigation bar constraints
@@ -517,6 +577,37 @@ COMPONENT_REGISTRY: dict[ComponentType, ComponentMeta] = {
         constraints=_CONTROL_CONSTRAINTS,
         examples=("Quantity selector", "Guest count", "Item amount"),
     ),
+    ComponentType.DIVIDER: ComponentMeta(
+        type=ComponentType.DIVIDER,
+        category=ComponentCategory.CONTENT,
+        description="Visual separator between content",
+        aliases=("separator", "hr", "line"),
+        html_equivalents=("hr",),
+        constraints=_CONTROL_CONSTRAINTS,  # Leaf node
+    ),
+    ComponentType.DATA_GRID: ComponentMeta(
+        type=ComponentType.DATA_GRID,
+        category=ComponentCategory.CONTAINER,
+        description="Tabular data display",
+        aliases=("table", "grid", "datatable"),
+        html_equivalents=("table",),
+        constraints=_VERTICAL_CONTAINER,  # Allows children
+    ),
+    ComponentType.TREE: ComponentMeta(
+        type=ComponentType.TREE,
+        category=ComponentCategory.NAVIGATION,
+        description="Hierarchical tree view",
+        aliases=("file_tree", "nested_list"),
+        html_equivalents=("ul", "li"),
+        constraints=_VERTICAL_CONTAINER,
+    ),
+    ComponentType.MENU_BAR: ComponentMeta(
+        type=ComponentType.MENU_BAR,
+        category=ComponentCategory.NAVIGATION,
+        description="Top-level application menu",
+        aliases=("menubar", "app_menu"),
+        constraints=_HORIZONTAL_CONTAINER,
+    ),
 }
 
 
@@ -607,6 +698,7 @@ class LayoutNodeSchema(BaseModel):
     for schema export and LLM prompt injection.
     """
 
+    # Identity
     id: str = Field(
         ...,
         description="Unique identifier (e.g., 'header', 'main-content')",
@@ -616,24 +708,90 @@ class LayoutNodeSchema(BaseModel):
         ...,
         description="Component type from the 26-category Rico taxonomy",
     )
+
+    # Content
     label: str | None = Field(
         None,
         description="Human-readable text content displayed by the component",
         examples=["Submit", "Welcome Back", "Search..."],
     )
+
+    # Structure
+    children: list["LayoutNodeSchema"] = Field(
+        default_factory=list,
+        description="Nested child nodes for hierarchical layouts",
+    )
+
+    # Layout - Flex/Grid
     flex_ratio: int = Field(
         default=1,
         ge=1,
         le=12,
         description="Grid span ratio (1-12) for relative width in parent",
     )
-    children: list["LayoutNodeSchema"] = Field(
-        default_factory=list,
-        description="Nested child nodes for hierarchical layouts",
+    width: int | str | None = Field(
+        default=None,
+        description="Fixed width (px) or relative ('100%', 'auto')",
+    )
+    height: int | str | None = Field(
+        default=None,
+        description="Fixed height (px) or relative ('100%', 'auto')",
     )
     orientation: Orientation = Field(
         default=Orientation.VERTICAL,
         description="Flow direction: horizontal, vertical, or overlay",
+    )
+
+    # Layout - Flex Container behavior
+    align: Alignment | None = Field(
+        default=None,
+        description="Cross-axis alignment for children (align-items)",
+    )
+    justify: Justify | None = Field(
+        default=None,
+        description="Main-axis distribution for children (justify-content)",
+    )
+    align_content: AlignContent | None = Field(
+        default=None,
+        description="Multi-line cross-axis alignment (align-content)",
+    )
+    gap: int | None = Field(
+        default=None,
+        ge=0,
+        description="Spacing between children in pixels",
+    )
+    wrap: Wrap | None = Field(
+        default=None,
+        description="Overflow wrap behavior",
+    )
+    padding: int | None = Field(
+        default=None,
+        ge=0,
+        description="Internal padding in pixels",
+    )
+
+    # Layout - Flex Item behavior
+    align_self: AlignSelf | None = Field(
+        default=None,
+        description="Self alignment override (align-self)",
+    )
+
+    # Text Styling
+    text_size: TextSize | None = Field(
+        default=None,
+        description="Text size hierarchy (title/heading/body/caption)",
+    )
+    text_weight: TextWeight | None = Field(
+        default=None,
+        description="Font weight (light/normal/bold)",
+    )
+    text_transform: TextTransform | None = Field(
+        default=None,
+        description="Text case transformation",
+    )
+    text_align: TextAlign | None = Field(
+        default=None,
+        description="Horizontal text alignment",
     )
 
     model_config = {"use_enum_values": True}
@@ -863,7 +1021,17 @@ __all__ = [
     # Enums
     "ComponentCategory",
     "ComponentType",
+    "ComponentType",
     "Orientation",
+    "Alignment",
+    "Justify",
+    "Wrap",
+    "AlignContent",
+    "AlignSelf",
+    "TextSize",
+    "TextWeight",
+    "TextTransform",
+    "TextAlign",
     # Metadata
     "ComponentConstraints",
     "ComponentMeta",

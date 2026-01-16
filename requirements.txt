@@ -13,6 +13,13 @@ pydantic
 # The venv-win environment is a conda env with faiss-gpu pre-installed
 numpy
 
+# PyTorch with CUDA 12.4 support
+# IMPORTANT: Must be installed BEFORE sentence-transformers to ensure GPU acceleration
+# CPU fallback is handled in Dockerfile when CUDA is unavailable
+# Install GPU version: pip install torch --index-url https://download.pytorch.org/whl/cu124
+# Install CPU version: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.5.0
+
 # Embedding Backends
 voyageai>=0.2.0
 sentence-transformers>=2.2

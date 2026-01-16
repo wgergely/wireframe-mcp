@@ -18,7 +18,7 @@ class D2Provider(LayoutProvider):
     D2 features used:
         - Nested containers with `{ }` blocks
         - Direction control via `direction: right/down`
-        - Width hints via `width: N%`
+        - Width hints via comments (D2 doesn't support % widths natively)
         - Style hints via comments for align, justify, gap, padding
         - Text styling hints via comments
 
@@ -29,11 +29,11 @@ class D2Provider(LayoutProvider):
           # layout: align=center, justify=between, gap=16
 
           sidebar: Navigation {
-            width: 25%
+            # width: 25%
           }
 
           main: Content {
-            width: 75%
+            # width: 75%
           }
         }
         ```
@@ -81,10 +81,10 @@ class D2Provider(LayoutProvider):
         if node.orientation == Orientation.HORIZONTAL:
             lines.append(f"{prefix}  direction: right")
 
-        # Width hint based on flex ratio (if parent context exists)
+        # Width hint based on flex ratio (as comment - D2 doesn't support % widths)
         if node.flex_ratio != 1:
             width_pct = self._flex_to_percentage(node.flex_ratio)
-            lines.append(f"{prefix}  width: {width_pct}%")
+            lines.append(f"{prefix}  # width: {width_pct}%")
 
         # Layout properties as D2 style hints
         layout_hints = self._build_layout_hints(node)

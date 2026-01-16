@@ -137,7 +137,7 @@ def audit_normalization():
         print(f"  Valid layouts: {enrico_results['valid']}")
         print(f"  Invalid layouts: {enrico_results['invalid']}")
         print(f"  Total nodes: {enrico_results['total_nodes']}")
-        avg_nodes = enrico_results['total_nodes'] / enrico_results['total']
+        avg_nodes = enrico_results["total_nodes"] / enrico_results["total"]
         print(f"  Avg nodes/item: {avg_nodes:.1f}")
         print(f"  Max tree depth: {enrico_results['max_depth']}")
         print("  Component distribution:")

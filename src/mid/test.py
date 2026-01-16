@@ -3,7 +3,9 @@
 import pytest
 
 from src.mid import (
+    AlignContent,
     Alignment,
+    AlignSelf,
     ComponentType,
     Justify,
     LayoutNode,
@@ -110,10 +112,14 @@ class TestComponentType:
             "spinner",
             "date_picker",
             "number_stepper",
+            "tree",
+            "menu_bar",
+            "data_grid",
+            "divider",
         }
         actual = {ct.value for ct in ComponentType}
         assert actual == expected
-        assert len(actual) == 26
+        assert len(actual) == 30
 
 
 class TestLayoutNode:
@@ -139,12 +145,29 @@ class TestLayoutNode:
             label="Navigation",
             flex_ratio=3,
             orientation=Orientation.HORIZONTAL,
+            align_self=AlignSelf.STRETCH,
+            align_content=AlignContent.BETWEEN,
         )
         assert node.id == "drawer"
         assert node.type == "drawer"
         assert node.label == "Navigation"
         assert node.flex_ratio == 3
         assert node.orientation == "horizontal"
+        assert node.align_self == "stretch"
+        assert node.width is None
+        assert node.height is None
+
+    @pytest.mark.unit
+    def test_fixed_sizing(self):
+        """Node accepts fixed sizing."""
+        node = LayoutNode(
+            id="fixed",
+            type=ComponentType.CONTAINER,
+            width=200,
+            height="50%",
+        )
+        assert node.width == 200
+        assert node.height == "50%"
 
     @pytest.mark.unit
     def test_flex_ratio_valid_range(self):

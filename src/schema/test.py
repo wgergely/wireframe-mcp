@@ -4,6 +4,8 @@ import pytest
 
 from src.schema import (
     COMPONENT_REGISTRY,
+    AlignContent,
+    AlignSelf,
     ComponentCategory,
     ComponentType,
     LayoutNodeSchema,
@@ -33,9 +35,9 @@ class TestComponentRegistry:
             assert ct in COMPONENT_REGISTRY, f"Missing metadata for {ct}"
 
     @pytest.mark.unit
-    def test_registry_has_26_entries(self):
-        """Registry contains exactly 26 component definitions."""
-        assert len(COMPONENT_REGISTRY) == 26
+    def test_registry_has_30_entries(self):
+        """Registry contains exactly 30 component definitions."""
+        assert len(COMPONENT_REGISTRY) == 30
 
     @pytest.mark.unit
     def test_all_entries_have_descriptions(self):
@@ -184,7 +186,7 @@ class TestSchemaGeneration:
     def test_export_component_enum_schema(self):
         """Component enum schema has all types with descriptions."""
         schema = export_component_enum_schema()
-        assert len(schema) == 26
+        assert len(schema) == 30
         assert "button" in schema
         assert "container" in schema
         assert isinstance(schema["button"], str)
@@ -227,6 +229,13 @@ class TestLayoutNodeSchema:
         assert node.orientation == Orientation.VERTICAL
         assert node.children == []
         assert node.label is None
+        assert node.align is None
+        assert node.justify is None
+        assert node.align_content is None
+        assert node.align_self is None
+        assert node.gap is None
+        assert node.wrap is None
+        assert node.padding is None
 
 
 class TestValidation:
@@ -258,6 +267,27 @@ class TestValidation:
     def test_validate_orientation_invalid(self):
         """Invalid orientations return None."""
         assert validate_orientation("diagonal") is None
+
+
+class TestLayoutEnums:
+    """Tests for new layout alignment enums."""
+
+    @pytest.mark.unit
+    def test_align_content_values(self):
+        """All AlignContent values exist."""
+        assert AlignContent.START.value == "start"
+        assert AlignContent.CENTER.value == "center"
+        assert AlignContent.END.value == "end"
+        assert AlignContent.BETWEEN.value == "between"
+        assert AlignContent.AROUND.value == "around"
+        assert AlignContent.STRETCH.value == "stretch"
+
+    @pytest.mark.unit
+    def test_align_self_values(self):
+        """All AlignSelf values exist."""
+        assert AlignSelf.START.value == "start"
+        assert AlignSelf.AUTO.value == "auto"
+        assert AlignSelf.STRETCH.value == "stretch"
 
 
 class TestLayoutDictValidation:

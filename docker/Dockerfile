@@ -47,9 +47,11 @@ FROM base AS builder
 # Copy dependency files
 COPY pyproject.toml requirements.txt ./
 
-# Install Python dependencies
-# Note: faiss-gpu wheels ship with CUDA libs; we trust pip to resolve compatibility
-RUN pip install --no-cache-dir -r requirements.txt \
+# Install Python dependencies with GPU support
+# CRITICAL: PyTorch MUST be installed with CUDA from PyTorch's index BEFORE sentence-transformers
+# This ensures GPU acceleration is available for embeddings and model inference
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu124 \
+    && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir -e .
 
 # ----------------------------------------------------------------------------
