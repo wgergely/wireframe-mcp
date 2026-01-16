@@ -57,7 +57,8 @@
       "Bash(docker version:*)",
       "Bash(docker compose:*)",
       "Bash(docker info:*)",
-      "Bash(docker context:*)"
+      "Bash(docker context:*)",
+      "Bash(grep:*)"
     ]
   }
 }

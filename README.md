@@ -12,9 +12,7 @@ When a user asks an LLM to "make a dashboard with a sidebar and floating search"
 
 1. **The Black Box Effect**: No visibility into what the LLM "imagines" before code is written
 2. **Spatial Blindness**: LLMs lack inherent understanding of containment, overlap, docking, and flex relationships
-1.  **The Black Box Effect**: No visibility into what the LLM "imagines" before code is written
-2.  **Spatial Blindness**: LLMs lack inherent understanding of containment, overlap, docking, and flex relationships
-3.  **Wasted Iterations**: Structural errors are discovered only after implementation, requiring costly rewrites
+3. **Wasted Iterations**: Structural errors are discovered only after implementation, requiring costly rewrites
 
 Research (Chen et al. 2025, UIFormer Dec 2025) demonstrates that constraining LLM output to structured schemas improves user preference win rates by ~30% and reduces token consumption by ~50% while improving semantic accuracy.
 
@@ -22,7 +20,14 @@ Research (Chen et al. 2025, UIFormer Dec 2025) demonstrates that constraining LL
 
 The system implements a **Three-Stage Compiler** pattern that transforms fuzzy natural language intent into rigid, validated syntax. 
 
-For a deep dive into the data flow between **Corpus**, **MID**, and **IR**, see the [Architecture Guide](docs/architecture.md).
+For detailed documentation on each layer, see the module READMEs:
+- [Schema Module](src/schema/README.md) - Component taxonomy and metadata
+- [MID Layer](src/mid/) - Semantic layout model and validation
+- [IR Layer](src/ir/) - Transpilation context
+- [Corpus](src/corpus/README.md) - Dataset providers and normalization
+- [Providers](src/providers/README.md) - D2/PlantUML transpilers
+- [Vector](src/vector/README.md) - RAG and similarity search
+- [LLM](src/llm/README.md) - LLM provider integration
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -52,6 +57,26 @@ For a deep dive into the data flow between **Corpus**, **MID**, and **IR**, see 
 │  • Renders to PNG/SVG via Kroki for visual verification         │
 │  • User approves OR requests changes (loop back to Stage 1)     │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow Diagram
+
+```mermaid
+graph TD
+    User([User Intent]) -->|Prompt| LLM[LLM / Semantic Parser]
+    LLM -->|JSON| MID[MID Layer: Validation]
+    
+    subgraph "The Broker"
+    MID -->|Validated LayoutNode| IR[IR Layer: Transpilation Context]
+    IR -->|AST| Provider1[D2 Provider]
+    IR -->|AST| Provider2[PlantUML Provider]
+    end
+    
+    Provider1 -->|DSL| Render[Kroki / Rendering Engine]
+    Provider2 -->|DSL| Render
+    Render -->|Image| Result([Visual Layout Preview])
+    
+    Corpus[(Corpus: Rico/WebSight)] -.->|Few-shot Examples| LLM
 ```
 
 ## The Intermediate Representation (IR)
@@ -117,24 +142,28 @@ Offers a sketchy, wireframe aesthetic with high tolerance for LLM output variati
 
 ## Current Implementation Status
 
-### Completed
+### Core Modules
 
-| Module              | Status | Description                                              |
-|---------------------|--------|----------------------------------------------------------|
-| `src/mid`           | Done   | Semantic source of truth (Models & Validation)           |
-| `src/ir`            | Done   | Transpilation context (Bridge to Providers)              |
-| `src/providers/d2`  | Done   | D2 DSL transpiler with direction/width hints             |
-| `src/providers/plantuml` | Done | PlantUML Salt transpiler with component rendering      |
-| `src/corpus`        | Done   | Rico dataset download and integration                    |
+| Module | Status | Description |
+|--------|--------|-------------|
+| `src/schema` | ✅ Done | Component taxonomy (26 types), rich metadata, LLM schema export |
+| `src/mid` | ✅ Done | Semantic source of truth (LayoutNode model & validation) |
+| `src/ir` | ✅ Done | Transpilation context (Bridge to Providers) |
+| `src/providers/d2` | ✅ Done | D2 DSL transpiler with direction/width hints |
+| `src/providers/plantuml` | ✅ Done | PlantUML Salt transpiler with component rendering |
+| `src/corpus` | ✅ Done | Multi-provider dataset ingestion (Rico, Enrico, WebSight, ShowUI, EGFE) |
+| `src/vector` | ✅ Done | FAISS-GPU vector store with Voyage AI / local embeddings |
+| `src/render` | ✅ Done | Kroki integration for PNG/SVG rendering |
 
 ### In Progress / Planned
 
-| Module              | Status | Description                                              |
-|---------------------|--------|----------------------------------------------------------|
-| MCP Server          | Planned     | FastMCP-based tool exposure                              |
-| Kroki Integration   | Planned     | HTTP rendering to PNG/SVG                                |
-| RAG System          | Planned     | FAISS-GPU vector search for layout retrieval             |
-| Agentic Mode        | Planned     | Server-side LLM orchestration                            |
+| Module | Status | Description |
+|--------|--------|-------------|
+| MCP Server | Planned | FastMCP-based tool exposure |
+| `src/llm` | Planned | Unified LLM provider interface |
+| `src/prompt` | Planned | RAG-enhanced prompt builder |
+| Agentic Mode | Planned | Server-side LLM orchestration |
+
 
 ## Future: RAG-Enhanced Layout Generation
 

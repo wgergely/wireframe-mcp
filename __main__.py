@@ -1037,6 +1037,397 @@ def cmd_build(extra_args: list[str]) -> int:
         return 1
 
 
+# =============================================================================
+# Audit Command
+# =============================================================================
+
+
+def cmd_audit_corpus(args: argparse.Namespace) -> int:
+    """Run cross-provider corpus audit for data quality assessment."""
+    from collections import Counter
+
+    from src.corpus.normalizer import (
+        count_components,
+        extract_text_content,
+        node_count,
+        tree_depth,
+    )
+    from src.mid import ComponentType, is_valid
+
+    manager = CorpusManager()
+    providers = manager.list_providers()
+
+    if args.provider:
+        if args.provider not in providers:
+            logger.error(f"Unknown provider: {args.provider}")
+            logger.info(f"Available: {', '.join(providers)}")
+            return 1
+        providers = [args.provider]
+
+    all_metrics = []
+    limit = args.limit
+
+    for provider_name in providers:
+        logger.info("")
+        logger.info("=" * 60)
+        logger.info(f"AUDITING: {provider_name}")
+        logger.info("=" * 60)
+
+        try:
+            provider = manager.get_provider(provider_name)
+        except KeyError:
+            logger.warning("  Provider not found, skipping")
+            continue
+
+        if not provider.has_data():
+            logger.warning("  No data available, skipping")
+            continue
+
+        metrics = {
+            "provider": provider_name,
+            "total": 0,
+            "has_layout": 0,
+            "layout_valid": 0,
+            "has_screenshot": 0,
+            "has_text_content": 0,
+            "component_counts": Counter(),
+            "avg_tree_depth": 0,
+            "avg_node_count": 0,
+        }
+
+        depths = []
+        node_counts = []
+
+        for i, item in enumerate(manager.stream_data(provider_name)):
+            if i >= limit:
+                break
+
+            metrics["total"] += 1
+
+            if item.layout is not None:
+                metrics["has_layout"] += 1
+                if is_valid(item.layout):
+                    metrics["layout_valid"] += 1
+                depths.append(tree_depth(item.layout))
+                node_counts.append(node_count(item.layout))
+                comp_counts = count_components(item.layout)
+                for comp_type, count in comp_counts.items():
+                    metrics["component_counts"][comp_type] += count
+                texts = extract_text_content(item.layout)
+                if texts:
+                    metrics["has_text_content"] += 1
+
+            if item.screenshot_path and item.screenshot_path.exists():
+                metrics["has_screenshot"] += 1
+
+        if depths:
+            metrics["avg_tree_depth"] = sum(depths) / len(depths)
+        if node_counts:
+            metrics["avg_node_count"] = sum(node_counts) / len(node_counts)
+
+        total = metrics["total"]
+        if total > 0:
+            logger.info(f"  Samples: {total}")
+            logger.info(
+                f"  Layout: {metrics['has_layout']}/{total} "
+                f"({100 * metrics['has_layout'] / total:.0f}%)"
+            )
+            logger.info(
+                f"  Valid: {metrics['layout_valid']}/{total} "
+                f"({100 * metrics['layout_valid'] / total:.0f}%)"
+            )
+            logger.info(f"  Avg depth: {metrics['avg_tree_depth']:.1f}")
+            logger.info(f"  Avg nodes: {metrics['avg_node_count']:.1f}")
+
+            if metrics["component_counts"]:
+                logger.info("  Top components:")
+                for comp, count in metrics["component_counts"].most_common(5):
+                    logger.info(f"    {comp}: {count}")
+
+        all_metrics.append(metrics)
+
+    # Cross-provider comparison (if multiple)
+    if len(all_metrics) > 1:
+        logger.info("")
+        logger.info("=" * 80)
+        logger.info("CROSS-PROVIDER COMPARISON")
+        logger.info("=" * 80)
+
+        known_types = set(ct.value for ct in ComponentType)
+        all_components: Counter = Counter()
+        for m in all_metrics:
+            all_components.update(m["component_counts"])
+
+        logger.info("")
+        logger.info(
+            f"{'Provider':<15} {'Samples':>8} {'Layout%':>8} "
+            f"{'Valid%':>8} {'Depth':>6} {'Nodes':>6}"
+        )
+        logger.info("-" * 60)
+
+        for m in all_metrics:
+            total = m["total"]
+            if total == 0:
+                continue
+            logger.info(
+                f"{m['provider']:<15} {total:>8} "
+                f"{100 * m['has_layout'] / total:>7.0f}% "
+                f"{100 * m['layout_valid'] / total:>7.0f}% "
+                f"{m['avg_tree_depth']:>6.1f} "
+                f"{m['avg_node_count']:>6.1f}"
+            )
+
+        logger.info("")
+        logger.info("Top component types across providers:")
+        for comp, count in all_components.most_common(10):
+            in_mid = "✓" if comp in known_types else "✗"
+            logger.info(f"  {comp:<20} {count:>6} {in_mid}")
+
+    return 0
+
+
+def handle_audit_command(argv: list[str]) -> int:
+    """Handle audit command argument parsing."""
+    parser = argparse.ArgumentParser(
+        prog="python . audit",
+        description="Audit corpus data quality for vector DB and LLM grounding",
+    )
+    parser.add_argument(
+        "provider",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Specific provider to audit (default: all providers)",
+    )
+    parser.add_argument(
+        "--limit",
+        "-l",
+        type=int,
+        default=50,
+        help="Number of samples per provider (default: 50)",
+    )
+
+    args = parser.parse_args(argv)
+    return cmd_audit_corpus(args)
+
+
+# =============================================================================
+# Demo Command
+# =============================================================================
+
+
+def cmd_demo_render(args: argparse.Namespace) -> int:
+    """Demonstrate the render pipeline with sample layouts."""
+    from src.mid import LayoutNode, Orientation
+    from src.providers import get_provider
+    from src.render import OutputFormat, RenderClient, RenderConfig
+    from src.schema import ComponentType
+
+    # Sample layouts
+    layouts = {
+        "dashboard": lambda: LayoutNode(
+            id="root",
+            type=ComponentType.CONTAINER,
+            label="Dashboard",
+            orientation=Orientation.HORIZONTAL,
+            children=[
+                LayoutNode(
+                    id="sidebar",
+                    type=ComponentType.TOOLBAR,
+                    label="Navigation",
+                    orientation=Orientation.VERTICAL,
+                    flex_ratio=3,
+                    children=[
+                        LayoutNode(id="logo", type=ComponentType.IMAGE, label="Logo"),
+                        LayoutNode(
+                            id="nav-home", type=ComponentType.BUTTON, label="Home"
+                        ),
+                        LayoutNode(
+                            id="nav-settings",
+                            type=ComponentType.BUTTON,
+                            label="Settings",
+                        ),
+                    ],
+                ),
+                LayoutNode(
+                    id="main",
+                    type=ComponentType.CONTAINER,
+                    label="Content",
+                    flex_ratio=9,
+                    children=[
+                        LayoutNode(
+                            id="header", type=ComponentType.TOOLBAR, label="Header"
+                        ),
+                        LayoutNode(
+                            id="cards",
+                            type=ComponentType.CONTAINER,
+                            orientation=Orientation.HORIZONTAL,
+                            children=[
+                                LayoutNode(
+                                    id="card1", type=ComponentType.CARD, label="Stats"
+                                ),
+                                LayoutNode(
+                                    id="card2", type=ComponentType.CARD, label="Chart"
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        "login": lambda: LayoutNode(
+            id="root",
+            type=ComponentType.CONTAINER,
+            label="Login",
+            orientation=Orientation.VERTICAL,
+            align="center",
+            justify="center",
+            children=[
+                LayoutNode(
+                    id="form",
+                    type=ComponentType.CARD,
+                    label="Login Form",
+                    children=[
+                        LayoutNode(
+                            id="title", type=ComponentType.TEXT, label="Welcome Back"
+                        ),
+                        LayoutNode(id="email", type=ComponentType.INPUT, label="Email"),
+                        LayoutNode(
+                            id="password", type=ComponentType.INPUT, label="Password"
+                        ),
+                        LayoutNode(
+                            id="submit", type=ComponentType.BUTTON, label="Sign In"
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        "settings": lambda: LayoutNode(
+            id="root",
+            type=ComponentType.CONTAINER,
+            label="Settings",
+            orientation=Orientation.VERTICAL,
+            children=[
+                LayoutNode(id="header", type=ComponentType.TOOLBAR, label="Settings"),
+                LayoutNode(
+                    id="options",
+                    type=ComponentType.LIST_ITEM,
+                    label="Options",
+                    children=[
+                        LayoutNode(
+                            id="opt1",
+                            type=ComponentType.CHECKBOX,
+                            label="Enable notifications",
+                        ),
+                        LayoutNode(
+                            id="opt2",
+                            type=ComponentType.CHECKBOX,
+                            label="Dark mode",
+                        ),
+                        LayoutNode(
+                            id="opt3",
+                            type=ComponentType.CHECKBOX,
+                            label="Auto-save",
+                        ),
+                    ],
+                ),
+                LayoutNode(id="save", type=ComponentType.BUTTON, label="Save Changes"),
+            ],
+        ),
+    }
+
+    # Get layout
+    layout_name = args.layout
+    if layout_name not in layouts:
+        logger.error(f"Unknown layout: {layout_name}")
+        logger.info(f"Available layouts: {', '.join(layouts.keys())}")
+        return 1
+
+    layout = layouts[layout_name]()
+
+    # Transpile
+    provider = get_provider(args.provider)
+    dsl = provider.transpile(layout)
+
+    logger.info(f"Layout: {layout_name}")
+    logger.info(f"Provider: {args.provider}")
+    logger.info("")
+    logger.info("DSL Output:")
+    logger.info("-" * 40)
+    print(dsl)
+    logger.info("-" * 40)
+
+    # Render if requested
+    if args.render:
+        import os
+
+        kroki_url = os.environ.get("KROKI_URL", "http://localhost:8000")
+        client = RenderClient(base_url=kroki_url)
+
+        if not client.is_available():
+            logger.error("Kroki service not available")
+            logger.info("Start with: python . build --kroki up")
+            return 1
+
+        output_format = OutputFormat[args.format.upper()]
+        config = RenderConfig(output_format=output_format)
+        result = client.render(dsl, args.provider, config)
+
+        output_path = args.output or Path(f"demo_{layout_name}.{args.format}")
+        output_path.write_bytes(result.data)
+        logger.info(f"Rendered to: {output_path} ({result.size_bytes} bytes)")
+
+    return 0
+
+
+def handle_demo_command(argv: list[str]) -> int:
+    """Handle demo command argument parsing."""
+    parser = argparse.ArgumentParser(
+        prog="python . demo",
+        description="Demonstrate the render pipeline with sample layouts",
+    )
+    parser.add_argument(
+        "layout",
+        type=str,
+        nargs="?",
+        default="dashboard",
+        choices=["dashboard", "login", "settings"],
+        help="Sample layout to render (default: dashboard)",
+    )
+    parser.add_argument(
+        "--provider",
+        "-p",
+        type=str,
+        default="plantuml",
+        choices=["d2", "plantuml"],
+        help="DSL provider (default: plantuml)",
+    )
+    parser.add_argument(
+        "--render",
+        "-r",
+        action="store_true",
+        help="Render to image (requires Kroki)",
+    )
+    parser.add_argument(
+        "--format",
+        "-f",
+        type=str,
+        default="png",
+        choices=["png", "svg"],
+        help="Output format (default: png)",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=None,
+        help="Output file path",
+    )
+
+    args = parser.parse_args(argv)
+    return cmd_demo_render(args)
+
+
 def cmd_docker(extra_args: list[str]) -> int:
     """Manage docker backends and configuration.
 
@@ -1101,42 +1492,91 @@ def cmd_docker(extra_args: list[str]) -> int:
         return 1
 
 
+# =============================================================================
+# Dev Subcommand Handler
+# =============================================================================
+
+
+def handle_dev_command(argv: list[str]) -> int:
+    """Handle development workflow commands.
+
+    Usage:
+        python . dev test [args]       # Run pytest
+        python . dev stats [provider]  # Corpus data profiling
+        python . dev benchmark [args]  # Performance benchmarks
+        python . dev index [args]      # Build/manage indices
+        python . dev corpus [args]     # Corpus data management
+        python . dev demo [args]       # Render pipeline demo
+    """
+    if not argv:
+        print("Development workflow commands")
+        print("\nUsage: python . dev {command} [args]")
+        print("\nCommands:")
+        print("  test       Run pytest with tier options")
+        print("  stats      Corpus data profiling and statistics")
+        print("  benchmark  Search quality and performance benchmarks")
+        print("  index      Build and manage vector indices")
+        print("  corpus     Corpus data management (download, list)")
+        print("  demo       Render pipeline demonstration")
+        print("\nExamples:")
+        print("  python . dev test --unit           # Fast unit tests")
+        print("  python . dev test --integration    # Integration tests")
+        print("  python . dev stats rico_semantic   # Profile provider data")
+        print("  python . dev benchmark -v          # Run benchmarks verbose")
+        print("  python . dev index build --all     # Build full index")
+        print("  python . dev corpus download rico  # Download corpus")
+        print("  python . dev demo login -r         # Render login demo")
+        return 1
+
+    subcommand = argv[0]
+    subargs = argv[1:]
+
+    dev_commands = {
+        "test": lambda: cmd_test(subargs),
+        "stats": lambda: handle_stats_command(subargs),
+        "benchmark": lambda: handle_benchmark_command(subargs),
+        "index": lambda: handle_index_command(subargs),
+        "corpus": lambda: handle_corpus_command(subargs),
+        "demo": lambda: handle_demo_command(subargs),
+    }
+
+    if subcommand in dev_commands:
+        return dev_commands[subcommand]()
+
+    logger.error(f"Unknown dev command: {subcommand}")
+    return handle_dev_command([])  # Show help
+
+
+def handle_stats_command(argv: list[str]) -> int:
+    """Handle stats command (renamed from audit - data profiling)."""
+    # Reuse the existing audit command implementation
+    return handle_audit_command(argv)
+
+
 def show_help() -> None:
     """Display CLI help message."""
     print("Usage: python . {command} [args]")
-    print("\nCommands:")
+    print("\n=== MCP Server Operations ===")
     print("  generate   Generate UI layouts from natural language")
-    print("  index      Build and manage vector indices")
-    print("  search     Search vector indices")
-    print("  benchmark  Run search quality benchmarks")
-    print("  corpus     Manage corpus data (download, list)")
-    print("  test       Run tests (wrapper for pytest)")
-    print("  build      Manage docker containers (wrapper for docker compose)")
-    print("  docker     Manage docker backends and configuration")
-    print("\nExamples:")
+    print("  search     Search vector indices for similar layouts")
+    print("  build      Manage Docker containers (start/stop services)")
+    print("  docker     Docker backend configuration")
+    print("\n=== Development ===")
+    print("  dev        Development workflows (test, benchmark, etc.)")
+    print("\nMCP Examples:")
     print("  python . generate 'login form with email and password'")
     print("  python . generate models")
-    print(
-        "  python . index build --all           # Build full RAG index (auto-downloads)"
-    )
-    print("  python . index build rico_semantic   # Build index for single provider")
-    print("  python . index info data/index       # Show index statistics")
     print("  python . search 'dashboard with sidebar' -k 3")
-    print("  python . benchmark -v                # Run benchmarks with verbose output")
-    print("  python . corpus datasets             # List available providers")
-    print("  python . corpus download rico_semantic")
-    print("  python . test -v")
-    print("\nDocker commands:")
-    print("  python . build                       # Build dev image")
-    print("  python . build up                    # Start dev containers (hot reload)")
-    print("  python . build --kroki up            # Start with kroki rendering backend")
-    print("  python . build down                  # Stop containers")
-    print("  python . build --prod build          # Build production image")
-    print("  python . build --prod up -d          # Start production containers")
-    print("\nDocker backend commands:")
-    print("  python . docker modes                # List available modes")
-    print("  python . docker backends             # List available backends")
-    print("  python . docker compose up           # Start with all backends")
+    print("  python . build --kroki up            # Start Kroki renderer")
+    print("  python . build down                  # Stop services")
+    print("\nDevelopment Examples:")
+    print("  python . dev test --unit             # Run unit tests")
+    print("  python . dev stats                   # Profile corpus data")
+    print("  python . dev benchmark -v            # Run benchmarks")
+    print("  python . dev index build --all       # Build RAG index")
+    print("  python . dev corpus download rico    # Download corpus data")
+    print("  python . dev demo dashboard          # Demo render pipeline")
+    print("\nFor dev command details: python . dev")
 
 
 def main() -> int:
@@ -1152,16 +1592,19 @@ def main() -> int:
         show_help()
         return 0
 
-    commands = {
+    # MCP server operations
+    mcp_commands = {
         "generate": lambda: handle_generate_command(rest_args),
-        "index": lambda: handle_index_command(rest_args),
         "search": lambda: handle_search_command(rest_args),
-        "benchmark": lambda: handle_benchmark_command(rest_args),
-        "corpus": lambda: handle_corpus_command(rest_args),
-        "test": lambda: cmd_test(rest_args),
         "build": lambda: cmd_build(rest_args),
         "docker": lambda: cmd_docker(rest_args),
     }
+
+    # Development commands (nested under 'dev')
+    if command == "dev":
+        return handle_dev_command(rest_args)
+
+    commands = mcp_commands
 
     if command in commands:
         setup_logging()
