@@ -955,42 +955,113 @@ def cmd_build(extra_args: list[str]) -> int:
         python . build down         # Stop containers
         python . build --prod up    # Start production containers
         python . build --prod build # Build production image
+        python . build --kroki up   # Start with kroki rendering backend
     """
-    docker_dir = Path("docker")
-    base_file = docker_dir / "docker-compose.yml"
+    from docker import get_compose_files
 
-    if not base_file.exists():
-        logger.error(f"Error: {base_file} not found.")
-        return 1
-
-    # Check for --prod flag
-    mode = "dev"
-    if "--prod" in extra_args:
-        mode = "prod"
-        extra_args = [arg for arg in extra_args if arg != "--prod"]
-
-    override_file = docker_dir / f"docker-compose.{mode}.yml"
-    if not override_file.exists():
-        logger.error(f"Error: {override_file} not found.")
-        return 1
-
-    action = extra_args if extra_args else ["build"]
-    final_cmd = [
-        "docker",
-        "compose",
-        "-f",
-        str(base_file),
-        "-f",
-        str(override_file),
-        *action,
-    ]
-
-    logger.info(f"Mode: {mode}")
-    logger.info(f"Running: {' '.join(final_cmd)}")
     try:
-        return subprocess.call(final_cmd)
-    except KeyboardInterrupt:
-        return 130
+        # Parse flags
+        mode = "dev"
+        include_kroki = False
+
+        # Process flags
+        remaining_args = []
+        for arg in extra_args:
+            if arg == "--prod":
+                mode = "prod"
+            elif arg == "--kroki":
+                include_kroki = True
+            else:
+                remaining_args.append(arg)
+
+        # Get compose files
+        compose_files = get_compose_files(mode=mode, include_kroki=include_kroki)
+
+        # Build command
+        action = remaining_args if remaining_args else ["build"]
+        compose_args = []
+        for file in compose_files:
+            compose_args.extend(["-f", str(file)])
+
+        final_cmd = ["docker", "compose", *compose_args, *action]
+
+        logger.info(f"Mode: {mode}")
+        if include_kroki:
+            logger.info("Backends: kroki rendering enabled")
+        logger.info(f"Running: {' '.join(final_cmd)}")
+
+        try:
+            return subprocess.call(final_cmd)
+        except KeyboardInterrupt:
+            return 130
+
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return 1
+
+
+def cmd_docker(extra_args: list[str]) -> int:
+    """Manage docker backends and configuration.
+
+    Usage:
+        python . docker modes              # List available modes
+        python . docker backends           # List available backends
+        python . docker compose [args]     # Run docker compose directly
+    """
+    from docker import get_compose_files, list_backends, list_modes
+
+    if not extra_args:
+        print("Docker backend management")
+        print("\nUsage: python . docker {command}")
+        print("\nCommands:")
+        print("  modes              List available modes (dev, prod)")
+        print("  backends           List available backends (kroki, etc)")
+        print("  compose [args]     Run docker compose with all backends")
+        return 1
+
+    command = extra_args[0]
+    rest_args = extra_args[1:]
+
+    if command == "modes":
+        logger.info("Available modes:")
+        for mode in list_modes():
+            logger.info(f"  - {mode}")
+        return 0
+
+    elif command == "backends":
+        logger.info("Available backends:")
+        for backend in list_backends():
+            logger.info(f"  - {backend}")
+        return 0
+
+    elif command == "compose":
+        # Run docker compose with all backends enabled
+        try:
+            mode = "dev"
+            if "--prod" in rest_args:
+                mode = "prod"
+                rest_args = [arg for arg in rest_args if arg != "--prod"]
+
+            compose_files = get_compose_files(mode=mode, include_kroki=True)
+            compose_args = []
+            for file in compose_files:
+                compose_args.extend(["-f", str(file)])
+
+            final_cmd = ["docker", "compose", *compose_args, *rest_args]
+            logger.info(f"Running: {' '.join(final_cmd)}")
+
+            try:
+                return subprocess.call(final_cmd)
+            except KeyboardInterrupt:
+                return 130
+
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            return 1
+
+    else:
+        logger.error(f"Unknown docker command: {command}")
+        return 1
 
 
 def show_help() -> None:
@@ -1004,6 +1075,7 @@ def show_help() -> None:
     print("  corpus     Manage corpus data (download, list)")
     print("  test       Run tests (wrapper for pytest)")
     print("  build      Manage docker containers (wrapper for docker compose)")
+    print("  docker     Manage docker backends and configuration")
     print("\nExamples:")
     print("  python . generate 'login form with email and password'")
     print("  python . generate models")
@@ -1020,9 +1092,14 @@ def show_help() -> None:
     print("\nDocker commands:")
     print("  python . build                       # Build dev image")
     print("  python . build up                    # Start dev containers (hot reload)")
+    print("  python . build --kroki up            # Start with kroki rendering backend")
     print("  python . build down                  # Stop containers")
     print("  python . build --prod build          # Build production image")
     print("  python . build --prod up -d          # Start production containers")
+    print("\nDocker backend commands:")
+    print("  python . docker modes                # List available modes")
+    print("  python . docker backends             # List available backends")
+    print("  python . docker compose up           # Start with all backends")
 
 
 def main() -> int:
@@ -1046,6 +1123,7 @@ def main() -> int:
         "corpus": lambda: handle_corpus_command(rest_args),
         "test": lambda: cmd_test(rest_args),
         "build": lambda: cmd_build(rest_args),
+        "docker": lambda: cmd_docker(rest_args),
     }
 
     if command in commands:

@@ -14,6 +14,8 @@ from docker.lib import (
     VOLUME_OUTPUT,
     get_compose_files,
     get_container_path,
+    list_backends,
+    list_modes,
 )
 
 __all__ = [
@@ -30,4 +32,6 @@ __all__ = [
     "KROKI_PORT",
     "get_container_path",
     "get_compose_files",
+    "list_backends",
+    "list_modes",
 ]

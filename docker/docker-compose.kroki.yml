@@ -1,0 +1,37 @@
+version: '3'
+
+services:
+  kroki:
+    image: yuzutech/kroki
+    ports:
+      - "8000:8000"
+    environment:
+      - KROKI_MERMAID_HOST=mermaid
+      - KROKI_BPMN_HOST=bpmn
+      - KROKI_EXCALIDRAW_HOST=excalidraw
+      - KROKI_D2_HOST=d2
+    depends_on:
+      - mermaid
+      - bpmn
+      - excalidraw
+      - d2
+
+  mermaid:
+    image: yuzutech/kroki-mermaid
+    expose:
+      - "8002"
+
+  bpmn:
+    image: yuzutech/kroki-bpmn
+    expose:
+      - "8003"
+
+  excalidraw:
+    image: yuzutech/kroki-excalidraw
+    expose:
+      - "8004"
+
+  d2:
+    image: yuzutech/kroki-d2
+    expose:
+      - "8012"

@@ -21,6 +21,8 @@ __all__ = [
     "KROKI_PORT",
     "get_container_path",
     "get_compose_files",
+    "list_backends",
+    "list_modes",
 ]
 
 # Docker image configuration
@@ -56,23 +58,86 @@ def get_container_path(subpath: str, base: PurePosixPath = CORPUS_DATA_PATH) -> 
     return str(base / subpath)
 
 
-def get_compose_files(mode: str = "dev") -> list[Path]:
+def get_compose_files(
+    mode: str = "dev",
+    include_kroki: bool = False,
+    include_backends: list[str] | None = None,
+) -> list[Path]:
     """Get the docker-compose files for a given mode.
 
     Args:
         mode: Either 'dev' or 'prod'. Defaults to 'dev'.
+        include_kroki: Include kroki backend. Defaults to False.
+        include_backends: Additional backend compose files (e.g. ['gpu', 'postgres']).
+            Defaults to None.
 
     Returns:
-        List of Path objects for the compose files.
+        List of Path objects for the compose files in correct order.
 
     Raises:
-        ValueError: If mode is not 'dev' or 'prod'.
+        ValueError: If mode is not 'dev' or 'prod', or invalid backend specified.
     """
     if mode not in ("dev", "prod"):
         raise ValueError(f"Invalid mode: {mode}. Must be 'dev' or 'prod'.")
 
     docker_dir = Path(__file__).parent
-    base_file = docker_dir / "docker-compose.yml"
-    override_file = docker_dir / f"docker-compose.{mode}.yml"
+    files = [docker_dir / "docker-compose.yml"]
 
-    return [base_file, override_file]
+    # Add mode-specific overrides
+    mode_file = docker_dir / f"docker-compose.{mode}.yml"
+    if mode_file.exists():
+        files.append(mode_file)
+
+    # Add kroki backend if requested
+    if include_kroki:
+        kroki_file = docker_dir / "docker-compose.kroki.yml"
+        if kroki_file.exists():
+            files.append(kroki_file)
+        else:
+            raise ValueError(f"Kroki compose file not found: {kroki_file}")
+
+    # Add other backend overrides
+    if include_backends:
+        for backend in include_backends:
+            backend_file = docker_dir / f"docker-compose.{backend}.yml"
+            if backend_file.exists():
+                files.append(backend_file)
+            else:
+                raise ValueError(
+                    f"Backend compose file not found: {backend_file} "
+                    f"(backend: {backend})"
+                )
+
+    return files
+
+
+def list_modes() -> list[str]:
+    """List available docker-compose modes.
+
+    Returns:
+        List of available modes (e.g., ['dev', 'prod']).
+    """
+    docker_dir = Path(__file__).parent
+    modes = []
+    for file in docker_dir.glob("docker-compose.*.yml"):
+        # Extract mode from filename (docker-compose.MODE.yml)
+        mode = file.stem.replace("docker-compose.", "")
+        if mode and mode not in ("kroki",):  # Exclude special backends
+            modes.append(mode)
+    return sorted(modes)
+
+
+def list_backends() -> list[str]:
+    """List available docker-compose backends.
+
+    Returns:
+        List of available backends (e.g., ['kroki', 'gpu', 'postgres']).
+    """
+    docker_dir = Path(__file__).parent
+    backends = []
+    for file in docker_dir.glob("docker-compose.*.yml"):
+        # Extract backend from filename (docker-compose.BACKEND.yml)
+        name = file.stem.replace("docker-compose.", "")
+        if name and name not in ("dev", "prod"):  # Exclude modes
+            backends.append(name)
+    return sorted(backends)
