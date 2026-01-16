@@ -3,8 +3,7 @@
 Supports DeepSeek V3.2, DeepSeek R1, and DeepSeek Coder models.
 """
 
-import os
-
+from ...config import EnvVar, get_environment
 from .base import AuthenticationError
 from .model_spec import DEFAULT_DEEPSEEK_MODEL, get_llm_spec
 from .openai import OpenAIBackend
@@ -50,7 +49,7 @@ class DeepSeekBackend(OpenAIBackend):
         Raises:
             AuthenticationError: If no API key available.
         """
-        resolved_api_key = api_key or os.environ.get("DEEPSEEK_API_KEY")
+        resolved_api_key = api_key or get_environment(EnvVar.DEEPSEEK_API_KEY)
         if not resolved_api_key:
             raise AuthenticationError(
                 "DeepSeek API key required. Set DEEPSEEK_API_KEY environment "

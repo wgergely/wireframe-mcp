@@ -9,7 +9,6 @@ This module provides:
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import time
@@ -18,6 +17,8 @@ from typing import TYPE_CHECKING, Generator
 
 import pytest
 from dotenv import load_dotenv
+
+from src.config import get_kroki_url
 
 if TYPE_CHECKING:
     from src.mid import LayoutNode
@@ -34,7 +35,7 @@ load_dotenv()
 
 TEST_INDEX_PATH = Path("data/test-index")
 TEST_INDEX_LIMIT = 50  # Small index for fast testing
-KROKI_URL = os.environ.get("KROKI_URL", "http://localhost:8000")
+KROKI_URL = get_kroki_url()
 DOCKER_COMPOSE_DIR = Path(__file__).parent / "docker"
 
 

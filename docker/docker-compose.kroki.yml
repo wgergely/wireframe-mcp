@@ -1,10 +1,20 @@
-version: '3'
+# Kroki rendering service with companion services
+# This extends the base kroki service with additional diagram renderers
+#
+# Port Configuration (override via environment):
+#   KROKI_PORT - External port for Kroki API (default: 18000)
+#
+# Internal ports (not exposed externally):
+#   - mermaid: 8002
+#   - bpmn: 8003
+#   - excalidraw: 8004
+#   - d2: 8012
 
 services:
   kroki:
     image: yuzutech/kroki
     ports:
-      - "8000:8000"
+      - "${KROKI_PORT:-18000}:8000"
     environment:
       - KROKI_MERMAID_HOST=mermaid
       - KROKI_BPMN_HOST=bpmn

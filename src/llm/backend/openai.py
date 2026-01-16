@@ -5,9 +5,9 @@ Supports GPT-5.x, GPT-4.x, and other OpenAI models via the OpenAI API.
 
 import json
 import logging
-import os
 from typing import Any
 
+from ...config import EnvVar, get_environment
 from .base import (
     AuthenticationError,
     ContextLengthError,
@@ -60,7 +60,7 @@ class OpenAIBackend(LLMBackend):
         Raises:
             AuthenticationError: If no API key available.
         """
-        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self._api_key = api_key or get_environment(EnvVar.OPENAI_API_KEY)
         if not self._api_key:
             raise AuthenticationError(
                 "OpenAI API key required. Set OPENAI_API_KEY environment "

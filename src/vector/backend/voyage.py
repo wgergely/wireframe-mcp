@@ -5,13 +5,13 @@ Supports batch processing with adaptive rate limiting and concurrent requests.
 """
 
 import logging
-import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import numpy as np
 
+from ...config import EnvVar, get_environment
 from ..types import (
     VOYAGE_BATCH_SIZE,
     VOYAGE_CONCURRENT_BATCHES,
@@ -80,7 +80,7 @@ class VoyageBackend(EmbeddingBackend):
         Raises:
             ValueError: If no API key available.
         """
-        self._api_key = api_key or os.environ.get("VOYAGE_API_KEY")
+        self._api_key = api_key or get_environment(EnvVar.VOYAGE_API_KEY)
         if not self._api_key:
             raise ValueError(
                 "Voyage API key required. Set VOYAGE_API_KEY environment variable "

@@ -93,8 +93,9 @@ ENV MCP_HOST=0.0.0.0 \
 EXPOSE 8080
 
 # Dev mode: run with python -u for unbuffered output
+# The project uses __main__.py at root (run with `python .`)
 ENTRYPOINT ["python", "-u"]
-CMD ["-m", "src"]
+CMD ["."]
 
 # ----------------------------------------------------------------------------
 # Production target: Optimized runtime image
@@ -140,4 +141,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "from src import list_providers; list_providers()" || exit 1
 
 ENTRYPOINT ["python"]
-CMD ["-m", "src"]
+CMD ["."]

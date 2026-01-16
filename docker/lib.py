@@ -3,9 +3,13 @@
 This module provides constants and utility functions for Docker container
 configuration, including image names, registry settings, volume names,
 and container paths.
+
+Port and host configuration is managed centrally via src.config module.
 """
 
 from pathlib import Path, PurePosixPath
+
+from src.config import EnvVar, get_environment
 
 __all__ = [
     "DOCKER_IMAGE_NAME",
@@ -19,6 +23,8 @@ __all__ = [
     "VOLUME_OUTPUT",
     "KROKI_HOST",
     "KROKI_PORT",
+    "MCP_HOST",
+    "MCP_PORT",
     "get_container_path",
     "get_compose_files",
     "list_backends",
@@ -40,9 +46,30 @@ CORPUS_MODELS_PATH: PurePosixPath = PurePosixPath("/app/corpus/models")
 CONFIG_PATH: PurePosixPath = PurePosixPath("/app/config")
 OUTPUT_PATH: PurePosixPath = PurePosixPath("/app/data")
 
-# Kroki renderer configuration (internal network)
-KROKI_HOST: str = "kroki"
-KROKI_PORT: int = 8000
+# Kroki renderer configuration - uses centralized config
+KROKI_HOST: str = "kroki"  # Docker internal hostname
+
+
+def _get_kroki_port() -> int:
+    """Get Kroki port from centralized config."""
+    return get_environment(EnvVar.KROKI_PORT)
+
+
+def _get_mcp_host() -> str:
+    """Get MCP host from centralized config."""
+    return get_environment(EnvVar.MCP_HOST)
+
+
+def _get_mcp_port() -> int:
+    """Get MCP port from centralized config."""
+    return get_environment(EnvVar.MCP_PORT)
+
+
+# Expose as module-level constants for backwards compatibility
+# These are evaluated at import time
+KROKI_PORT: int = _get_kroki_port()
+MCP_HOST: str = _get_mcp_host()
+MCP_PORT: int = _get_mcp_port()
 
 
 def get_container_path(subpath: str, base: PurePosixPath = CORPUS_DATA_PATH) -> str:

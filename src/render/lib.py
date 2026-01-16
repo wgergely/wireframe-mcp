@@ -5,7 +5,6 @@ output format, themes, scaling, and sizing options.
 """
 
 import base64
-import os
 import zlib
 from dataclasses import dataclass, field
 from enum import Enum
@@ -13,6 +12,7 @@ from typing import Any, Literal
 
 import httpx
 
+from ..config import get_kroki_url
 from ..ir import LayoutNode
 from ..providers import get_provider
 
@@ -208,9 +208,7 @@ class RenderClient:
                      or http://localhost:8000.
             timeout: Request timeout in seconds.
         """
-        self.base_url = (
-            base_url or os.environ.get("KROKI_URL") or "http://localhost:8000"
-        ).rstrip("/")
+        self.base_url = (base_url or get_kroki_url()).rstrip("/")
         self.timeout = timeout
         self._client = httpx.Client(timeout=timeout)
 

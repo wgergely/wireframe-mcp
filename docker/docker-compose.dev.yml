@@ -18,6 +18,10 @@ services:
       target: dev
     image: wireframe-mcp:dev
     container_name: wireframe-mcp-dev
+    # Keep container alive for interactive development
+    # Run commands with: docker exec wireframe-mcp-dev python . {command}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["echo 'Dev container ready. Use docker exec to run commands.' && tail -f /dev/null"]
     volumes:
       # Mount source code for hot reloading (overrides base volumes)
       - ../src:/app/src:ro

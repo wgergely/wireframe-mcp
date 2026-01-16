@@ -3,8 +3,7 @@
 Supports Qwen3-Max, Qwen-Turbo, Qwen-Plus, and other Alibaba Qwen models.
 """
 
-import os
-
+from ...config import EnvVar, get_environment
 from .base import AuthenticationError
 from .model_spec import DEFAULT_QWEN_MODEL, get_llm_spec
 from .openai import OpenAIBackend
@@ -50,7 +49,7 @@ class QwenBackend(OpenAIBackend):
         Raises:
             AuthenticationError: If no API key available.
         """
-        resolved_api_key = api_key or os.environ.get("QWEN_API_KEY")
+        resolved_api_key = api_key or get_environment(EnvVar.QWEN_API_KEY)
         if not resolved_api_key:
             raise AuthenticationError(
                 "Qwen API key required. Set QWEN_API_KEY environment "

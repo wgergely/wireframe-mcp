@@ -1,24 +1,64 @@
-"""Configuration management for corpus directories.
+"""Centralized configuration management for wireframe-mcp.
 
-Provides centralized path resolution for all corpus-related storage.
+Provides unified access to all configuration via the `get_environment()` function.
 
-Environment Variables:
-    CORPUS_DATA_DIR: Override corpus data directory ({repo_root}/.corpus/data).
-    CORPUS_MODELS_DIR: Override models directory ({repo_root}/.corpus/models).
-    CORPUS_INDEX_DIR: Override index directory ({repo_root}/.corpus/index).
-
-Examples:
-    >>> from src.config import get_data_dir, get_models_dir, get_index_dir
+Example:
+    >>> from src.config import EnvVar, get_environment
     >>>
-    >>> # Convenience functions
-    >>> data_dir = get_data_dir()
-    >>> models_dir = get_models_dir()
-    >>> index_dir = get_index_dir()
+    >>> # Get any environment variable with automatic type conversion
+    >>> port = get_environment(EnvVar.KROKI_PORT)  # Returns int: 18000
+    >>> api_key = get_environment(EnvVar.OPENAI_API_KEY)  # Returns str | None
     >>>
-    >>> # Generic API for custom subdirs
-    >>> cache_dir = get_corpus_dir("cache", "CORPUS_CACHE_DIR")
+    >>> # Override at runtime
+    >>> port = get_environment(EnvVar.KROKI_PORT, override=9000)
+    >>>
+    >>> # List available variables by category
+    >>> docker_vars = list_environment_variables("docker")
+    >>> for var in docker_vars:
+    ...     info = get_environment_info(var)
+    ...     print(f"{info.name}: {info.description}")
+
+Environment Variable Categories:
+    llm: API keys for LLM providers (OpenAI, Anthropic, DeepSeek, Qwen)
+    embedding: Embedding service configuration (Voyage, local)
+    service: Service URLs and hosts (Kroki, Ollama, MCP)
+    docker: Docker/container ports (avoids common ports 8000, 8080)
+    corpus: Data directory paths
 """
 
-from .lib import get_corpus_dir, get_data_dir, get_index_dir, get_models_dir
+from .lib import (
+    # Core types
+    EnvConfig,
+    EnvVar,
+    # Main interface
+    get_available_llm_providers,
+    get_corpus_path,
+    get_data_dir,
+    get_docker_ports,
+    get_environment,
+    get_environment_info,
+    get_index_dir,
+    get_kroki_url,
+    get_models_dir,
+    # Introspection
+    list_environment_variables,
+)
 
-__all__ = ["get_corpus_dir", "get_data_dir", "get_index_dir", "get_models_dir"]
+__all__ = [
+    # Core types
+    "EnvConfig",
+    "EnvVar",
+    # Main interface
+    "get_environment",
+    "get_environment_info",
+    # Convenience functions
+    "get_kroki_url",
+    "get_corpus_path",
+    "get_data_dir",
+    "get_models_dir",
+    "get_index_dir",
+    "get_available_llm_providers",
+    "get_docker_ports",
+    # Introspection
+    "list_environment_variables",
+]

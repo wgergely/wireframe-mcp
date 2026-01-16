@@ -5,10 +5,10 @@ Supports Claude 4.5, Claude 4.1, and other Claude models via the Anthropic API.
 
 import json
 import logging
-import os
 import re
 from typing import Any
 
+from ...config import EnvVar, get_environment
 from .base import (
     AuthenticationError,
     ContextLengthError,
@@ -62,7 +62,7 @@ class AnthropicBackend(LLMBackend):
         Raises:
             AuthenticationError: If no API key available.
         """
-        self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        self._api_key = api_key or get_environment(EnvVar.ANTHROPIC_API_KEY)
         if not self._api_key:
             raise AuthenticationError(
                 "Anthropic API key required. Set ANTHROPIC_API_KEY environment "

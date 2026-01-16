@@ -11,6 +11,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src.config import (
+    EnvVar,
+    get_available_llm_providers,
+    get_environment,
+    get_kroki_url,
+)
 from src.core import get_logger, setup_logging
 from src.corpus.api import CorpusManager
 
@@ -983,62 +989,8 @@ def cmd_test(extra_args: list[str]) -> int:
         return 130
 
 
-def cmd_build(extra_args: list[str]) -> int:
-    """Run docker compose commands.
-
-    Usage:
-        python . build              # Build dev image
-        python . build up           # Start dev containers
-        python . build down         # Stop containers
-        python . build --prod up    # Start production containers
-        python . build --prod build # Build production image
-        python . build --kroki up   # Start with kroki rendering backend
-    """
-    from docker import get_compose_files
-
-    try:
-        # Parse flags
-        mode = "dev"
-        include_kroki = False
-
-        # Process flags
-        remaining_args = []
-        for arg in extra_args:
-            if arg == "--prod":
-                mode = "prod"
-            elif arg == "--kroki":
-                include_kroki = True
-            else:
-                remaining_args.append(arg)
-
-        # Get compose files
-        compose_files = get_compose_files(mode=mode, include_kroki=include_kroki)
-
-        # Build command
-        action = remaining_args if remaining_args else ["build"]
-        compose_args = []
-        for file in compose_files:
-            compose_args.extend(["-f", str(file)])
-
-        final_cmd = ["docker", "compose", *compose_args, *action]
-
-        logger.info(f"Mode: {mode}")
-        if include_kroki:
-            logger.info("Backends: kroki rendering enabled")
-        logger.info(f"Running: {' '.join(final_cmd)}")
-
-        try:
-            return subprocess.call(final_cmd)
-        except KeyboardInterrupt:
-            return 130
-
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return 1
-
-
 # =============================================================================
-# Audit Command
+# Stats Command (Corpus Data Profiling)
 # =============================================================================
 
 
@@ -1359,9 +1311,7 @@ def cmd_demo_render(args: argparse.Namespace) -> int:
 
     # Render if requested
     if args.render:
-        import os
-
-        kroki_url = os.environ.get("KROKI_URL", "http://localhost:8000")
+        kroki_url = get_kroki_url()
         client = RenderClient(base_url=kroki_url)
 
         if not client.is_available():
@@ -1428,54 +1378,686 @@ def handle_demo_command(argv: list[str]) -> int:
     return cmd_demo_render(args)
 
 
-def cmd_docker(extra_args: list[str]) -> int:
-    """Manage docker backends and configuration.
+# =============================================================================
+# Service Command (MCP Infrastructure Management)
+# =============================================================================
+
+
+def _check_llm_availability() -> dict:
+    """Check which LLM providers are available.
+
+    Returns dict with:
+        - available: List of available provider names
+        - preferred: The recommended provider to use (or None)
+        - details: Dict of provider -> status info
+    """
+    import httpx
+
+    results = {
+        "available": [],
+        "preferred": None,
+        "details": {},
+    }
+
+    # Get cloud providers with available API keys from centralized config
+    cloud_descriptions = {
+        "openai": "OpenAI (GPT-4.1-mini)",
+        "anthropic": "Anthropic (Claude Sonnet 4.5)",
+        "deepseek": "DeepSeek (V3.2)",
+        "qwen": "Qwen (Turbo)",
+    }
+
+    available_providers = get_available_llm_providers()
+    for provider in available_providers:
+        results["available"].append(provider)
+        results["details"][provider] = {
+            "type": "cloud",
+            "description": cloud_descriptions.get(provider, provider),
+            "status": "API key found",
+        }
+        if results["preferred"] is None:
+            results["preferred"] = provider
+
+    # Check for Ollama (local)
+    ollama_url = get_environment(EnvVar.OLLAMA_HOST)
+    try:
+        response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
+        if response.status_code == 200:
+            data = response.json()
+            models = [m.get("name", "") for m in data.get("models", [])]
+            results["available"].append("ollama")
+            results["details"]["ollama"] = {
+                "type": "local",
+                "description": f"Ollama ({len(models)} models)",
+                "status": "Running",
+                "models": models[:5],  # First 5 models
+            }
+            if results["preferred"] is None:
+                results["preferred"] = "ollama"
+    except Exception:
+        results["details"]["ollama"] = {
+            "type": "local",
+            "description": "Ollama (local)",
+            "status": "Not running",
+        }
+
+    return results
+
+
+def _check_kroki_health(url: str, timeout: float = 5.0) -> bool:
+    """Check if Kroki service is healthy."""
+    import httpx
+
+    try:
+        response = httpx.get(f"{url}/health", timeout=timeout)
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
+def _check_voyage_api(timeout: float = 10.0) -> tuple[bool, str]:
+    """Check if Voyage API is accessible for embeddings."""
+    api_key = get_environment(EnvVar.VOYAGE_API_KEY)
+    if not api_key:
+        return False, "VOYAGE_API_KEY not set"
+
+    try:
+        import httpx
+
+        response = httpx.post(
+            "https://api.voyageai.com/v1/embeddings",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"input": "test", "model": "voyage-2"},
+            timeout=timeout,
+        )
+        if response.status_code == 200:
+            return True, "OK"
+        return False, f"API error: {response.status_code}"
+    except Exception as e:
+        return False, f"Connection error: {e}"
+
+
+def _parse_init_args(args: list[str]) -> dict:
+    """Parse service init arguments."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="python . service init",
+        description="Initialize MCP server with first-time setup",
+    )
+    parser.add_argument(
+        "--embedding",
+        "-e",
+        type=str,
+        choices=["voyage", "local"],
+        default="local",
+        help="Embedding backend: voyage (cloud) or local (default: local)",
+    )
+    parser.add_argument(
+        "--llm",
+        "-l",
+        type=str,
+        choices=["openai", "anthropic", "deepseek", "qwen", "ollama"],
+        default=None,
+        help="Preferred LLM provider (auto-detected if not specified)",
+    )
+    parser.add_argument(
+        "--kroki-port",
+        type=int,
+        default=18000,
+        help="Port for Kroki rendering service (default: 18000)",
+    )
+    parser.add_argument(
+        "--corpus",
+        "-c",
+        type=str,
+        default="rico_semantic",
+        help="Corpus provider to download (default: rico_semantic)",
+    )
+    parser.add_argument(
+        "--index-limit",
+        type=int,
+        default=100,
+        help="Max items to index during init (default: 100)",
+    )
+    parser.add_argument(
+        "--skip-docker",
+        action="store_true",
+        help="Skip Docker service startup",
+    )
+    parser.add_argument(
+        "--skip-corpus",
+        action="store_true",
+        help="Skip corpus download and indexing",
+    )
+    parser.add_argument(
+        "--show-env",
+        action="store_true",
+        help="Show MCP-compatible environment variables",
+    )
+
+    return vars(parser.parse_args(args))
+
+
+def _show_mcp_env_config() -> None:
+    """Display MCP-compatible environment configuration."""
+    print()
+    print("=" * 60)
+    print("MCP Server Environment Configuration")
+    print("=" * 60)
+    print()
+    print("Add these to your MCP client configuration (claude_desktop_config.json):")
+    print()
+    print("""{
+  "mcpServers": {
+    "wireframe": {
+      "command": "python",
+      "args": ["."],
+      "cwd": "/path/to/wireframe-mcp",
+      "env": {
+        "OPENAI_API_KEY": "sk-...",
+        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "DEEPSEEK_API_KEY": "sk-...",
+        "VOYAGE_API_KEY": "pa-...",
+        "KROKI_URL": "http://localhost:18000",
+        "KROKI_PORT": "18000",
+        "MCP_PORT": "18080",
+        "CORPUS_DATA_DIR": ".corpus/data",
+        "INDEX_DIR": ".corpus/index",
+        "EMBEDDING_BACKEND": "local",
+        "LLM_PROVIDER": "openai"
+      }
+    }
+  }
+}""")
+    print()
+    print("Environment Variables:")
+    print("  LLM Providers (at least one required):")
+    print("    OPENAI_API_KEY      - OpenAI API key")
+    print("    ANTHROPIC_API_KEY   - Anthropic API key")
+    print("    DEEPSEEK_API_KEY    - DeepSeek API key")
+    print("    QWEN_API_KEY        - Qwen/Alibaba API key")
+    print("    OLLAMA_HOST         - Ollama server URL (default: localhost:11434)")
+    print()
+    print("  Embeddings:")
+    print("    VOYAGE_API_KEY      - Voyage AI key (for cloud embeddings)")
+    print("    EMBEDDING_BACKEND   - 'voyage' or 'local' (default: local)")
+    print()
+    print("  Services:")
+    print("    KROKI_URL           - Kroki render service URL")
+    print("    KROKI_PORT          - Kroki port (default: 18000)")
+    print("    MCP_PORT            - MCP server port (default: 18080)")
+    print()
+    print("  Data:")
+    print("    CORPUS_DATA_DIR     - Corpus data directory")
+    print("    INDEX_DIR           - Vector index directory")
+    print()
+
+
+def cmd_service_init(args: list[str]) -> int:
+    """Initialize MCP server - complete first-time setup.
+
+    Steps:
+    1. Check LLM availability (fail if none available)
+    2. Start Docker services (with Kroki)
+    3. Wait for health checks
+    4. Download corpus data
+    5. Build RAG index
+    6. Verify optional services
+    """
+    import os
+    import time
+
+    from docker import get_compose_files
+
+    # Parse arguments
+    opts = _parse_init_args(args)
+
+    # Show env config and exit if requested
+    if opts["show_env"]:
+        _show_mcp_env_config()
+        return 0
+
+    print("=" * 60)
+    print("MCP Server Initialization")
+    print("=" * 60)
+    print()
+    print("Configuration:")
+    print(f"  Embedding backend: {opts['embedding']}")
+    print(f"  Kroki port: {opts['kroki_port']}")
+    print(f"  Corpus: {opts['corpus']}")
+    print(f"  Index limit: {opts['index_limit']}")
+    if opts["llm"]:
+        print(f"  Preferred LLM: {opts['llm']}")
+    print()
+
+    # Step 1: Check LLM availability
+    print("[1/6] Checking LLM availability...")
+    llm_status = _check_llm_availability()
+
+    # Override preferred if specified
+    if opts["llm"]:
+        if opts["llm"] in llm_status["available"]:
+            llm_status["preferred"] = opts["llm"]
+        else:
+            print(f"  WARNING: Requested LLM '{opts['llm']}' not available")
+
+    if not llm_status["available"]:
+        print()
+        print("ERROR: No LLM provider available!")
+        print()
+        print("You need at least one of:")
+        print("  - OPENAI_API_KEY (recommended)")
+        print("  - ANTHROPIC_API_KEY")
+        print("  - DEEPSEEK_API_KEY")
+        print("  - Ollama running locally")
+        print()
+        print("Set an API key in your .env file or start Ollama.")
+        print()
+        print("For MCP configuration help, run:")
+        print("  python . service init --show-env")
+        return 1
+
+    print(f"  Found {len(llm_status['available'])} provider(s):")
+    for provider in llm_status["available"]:
+        detail = llm_status["details"][provider]
+        marker = "*" if provider == llm_status["preferred"] else " "
+        print(f"  {marker} {detail['description']} - {detail['status']}")
+
+    print(f"  Preferred: {llm_status['preferred']}")
+    print()
+
+    # Step 2: Start Docker services
+    if opts["skip_docker"]:
+        print("[2/6] Skipping Docker services (--skip-docker)")
+    else:
+        print("[2/6] Starting Docker services...")
+        # Set port via environment
+        os.environ["KROKI_PORT"] = str(opts["kroki_port"])
+
+        try:
+            compose_files = get_compose_files(mode="dev", include_kroki=True)
+            compose_args = []
+            for f in compose_files:
+                compose_args.extend(["-f", str(f)])
+
+            result = subprocess.run(
+                ["docker", "compose", *compose_args, "up", "-d"],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                print("  ERROR: Failed to start services")
+                print(f"  {result.stderr}")
+                return 1
+            print("  Services started")
+        except FileNotFoundError:
+            print("  ERROR: Docker not found. Please install Docker.")
+            return 1
+
+    # Step 3: Wait for Kroki health
+    kroki_url = get_kroki_url()
+    if opts["skip_docker"]:
+        print("[3/6] Skipping Kroki health check (--skip-docker)")
+    else:
+        print("[3/6] Waiting for Kroki service...")
+        max_wait = 30
+        for i in range(max_wait):
+            if _check_kroki_health(kroki_url):
+                print(f"  Kroki healthy at {kroki_url}")
+                break
+            time.sleep(1)
+            if i % 5 == 4:
+                print(f"  Waiting... ({i + 1}s)")
+        else:
+            print(f"  WARNING: Kroki not responding after {max_wait}s")
+            print("  Rendering features may not work")
+    print()
+
+    # Step 4: Download corpus
+    if opts["skip_corpus"]:
+        print("[4/6] Skipping corpus download (--skip-corpus)")
+    else:
+        print("[4/6] Checking corpus data...")
+        manager = CorpusManager()
+        provider_name = opts["corpus"]
+
+        try:
+            provider = manager.get_provider(provider_name)
+            if provider.has_data():
+                print(f"  {provider_name} data already available")
+            else:
+                print(f"  Downloading {provider_name}...")
+                provider.fetch(force=False)
+                print("  Download complete")
+        except KeyError:
+            print(f"  ERROR: Unknown corpus provider '{provider_name}'")
+            print(f"  Available: {', '.join(manager.list_providers())}")
+        except Exception as e:
+            print(f"  WARNING: Could not fetch corpus: {e}")
+            print("  RAG features may not work")
+    print()
+
+    # Step 5: Build index
+    if opts["skip_corpus"]:
+        print("[5/6] Skipping index build (--skip-corpus)")
+    else:
+        print("[5/6] Checking RAG index...")
+        from src.config import get_index_dir
+
+        index_dir = get_index_dir()
+        index_file = index_dir / "index.faiss"
+
+        if index_file.exists():
+            print(f"  Index already exists at {index_dir}")
+        else:
+            embedding_backend = opts["embedding"]
+            print(f"  Building index with {embedding_backend} embeddings...")
+            try:
+                from src.vector import BackendType, VectorStore
+
+                backend_type = (
+                    BackendType.VOYAGE
+                    if embedding_backend == "voyage"
+                    else BackendType.LOCAL
+                )
+
+                # Check Voyage API if selected
+                if backend_type == BackendType.VOYAGE:
+                    voyage_ok, voyage_msg = _check_voyage_api()
+                    if not voyage_ok:
+                        print(f"  WARNING: Voyage not available ({voyage_msg})")
+                        print("  Falling back to local embeddings")
+                        backend_type = BackendType.LOCAL
+
+                store = VectorStore(backend=backend_type)
+                indexed = 0
+
+                manager = CorpusManager()
+                for item in manager.stream_data(opts["corpus"]):
+                    if item.layout is not None:
+                        store.index_item(item)
+                        indexed += 1
+                        if indexed >= opts["index_limit"]:
+                            break
+
+                if indexed > 0:
+                    store.save(index_dir)
+                    print(f"  Indexed {indexed} items to {index_dir}")
+                else:
+                    print("  WARNING: No items to index")
+            except Exception as e:
+                print(f"  WARNING: Could not build index: {e}")
+    print()
+
+    # Step 6: Verify optional services
+    print("[6/6] Checking optional services...")
+
+    # Voyage API
+    voyage_ok, voyage_msg = _check_voyage_api()
+    if voyage_ok:
+        print("  Voyage API: OK (production embeddings available)")
+    else:
+        print(f"  Voyage API: {voyage_msg} (using local embeddings)")
+
+    print()
+    print("=" * 60)
+    print("Initialization Complete!")
+    print("=" * 60)
+    print()
+    print("Quick start:")
+    print("  python . generate 'login form with email and password'")
+    print()
+    print("Service management:")
+    print("  python . service status   # Check health")
+    print("  python . service stop     # Stop services")
+    print("  python . service logs     # View logs")
+    print()
+    print("MCP configuration:")
+    print("  python . service init --show-env")
+    print()
+
+    return 0
+
+
+def cmd_service_status(_args: list[str]) -> int:
+    """Check health status of all MCP services."""
+    print("MCP Service Status")
+    print("=" * 50)
+    print()
+
+    # LLM providers
+    print("LLM Providers:")
+    llm_status = _check_llm_availability()
+    if llm_status["available"]:
+        for provider in llm_status["available"]:
+            detail = llm_status["details"][provider]
+            print(f"  [OK] {detail['description']}")
+        print(f"  Preferred: {llm_status['preferred']}")
+    else:
+        print("  [FAIL] No LLM provider available")
+    print()
+
+    # Kroki
+    print("Rendering Service:")
+    kroki_url = get_kroki_url()
+    if _check_kroki_health(kroki_url):
+        print(f"  [OK] Kroki at {kroki_url}")
+    else:
+        print(f"  [FAIL] Kroki not responding at {kroki_url}")
+    print()
+
+    # Voyage API
+    print("Embedding Service:")
+    voyage_ok, voyage_msg = _check_voyage_api()
+    if voyage_ok:
+        print("  [OK] Voyage API (cloud)")
+    else:
+        print(f"  [WARN] Voyage: {voyage_msg}")
+        print("  [OK] Local embeddings available as fallback")
+    print()
+
+    # RAG Index
+    print("RAG Index:")
+    from src.config import get_index_dir
+
+    index_dir = get_index_dir()
+    index_file = index_dir / "index.faiss"
+    if index_file.exists():
+        from src.vector import VectorStore
+
+        try:
+            store = VectorStore()
+            store.load(index_dir)
+            stats = store.stats()
+            print(f"  [OK] {stats.total_items} documents indexed")
+        except Exception as e:
+            print(f"  [WARN] Index exists but failed to load: {e}")
+    else:
+        print(f"  [WARN] No index found at {index_dir}")
+        print("  Run 'python . service init' to build index")
+    print()
+
+    return 0
+
+
+def cmd_service(extra_args: list[str]) -> int:
+    """Manage MCP server services.
 
     Usage:
-        python . docker modes              # List available modes
-        python . docker backends           # List available backends
-        python . docker compose [args]     # Run docker compose directly
+        python . service init              # First-time setup
+        python . service start [service]   # Start services (or specific service)
+        python . service stop [service]    # Stop services (or specific service)
+        python . service status            # Health check
+        python . service logs [service]    # View logs
+        python . service build [--no-cache] # Build images
     """
-    from docker import get_compose_files, list_backends, list_modes
+    import os
+
+    from docker import (
+        KROKI_PORT,
+        MCP_PORT,
+        get_compose_files,
+        list_backends,
+        list_modes,
+    )
+
+    # Available services for targeting
+    available_services = [
+        "wireframe-mcp",
+        "kroki",
+        "mermaid",
+        "bpmn",
+        "excalidraw",
+        "d2",
+    ]
 
     if not extra_args:
-        print("Docker backend management")
-        print("\nUsage: python . docker {command}")
+        print("MCP Service Management")
+        print("\nUsage: python . service {command} [options] [service]")
         print("\nCommands:")
-        print("  modes              List available modes (dev, prod)")
-        print("  backends           List available backends (kroki, etc)")
-        print("  compose [args]     Run docker compose with all backends")
+        print("  init                    First-time setup (recommended)")
+        print("  start [service]         Start all services or specific service")
+        print("  stop [service]          Stop all services or specific service")
+        print("  status                  Health check all services")
+        print("  logs [service]          View service logs")
+        print("  build [--no-cache]      Build Docker images")
+        print("  ps                      List running containers")
+        print("\nOptions:")
+        print("  --prod                  Use production configuration")
+        print("  --no-kroki              Start without Kroki renderer")
+        print("  --no-cache              Force rebuild without cache")
+        print("  --kroki-port PORT       Override Kroki port (default: 18000)")
+        print("  --mcp-port PORT         Override MCP server port (default: 18080)")
+        print(f"\nServices: {', '.join(available_services)}")
+        print("\nExamples:")
+        print("  python . service init              # Complete first-time setup")
+        print("  python . service start             # Start all services")
+        print("  python . service start kroki       # Start only Kroki")
+        print("  python . service stop wireframe-mcp # Stop only MCP server")
+        print("  python . service build --no-cache  # Force rebuild images")
+        print("  python . service logs kroki        # View Kroki logs")
+        print(f"\nDefault ports: MCP={MCP_PORT}, Kroki={KROKI_PORT}")
         return 1
 
     command = extra_args[0]
     rest_args = extra_args[1:]
 
+    # High-level commands
+    if command == "init":
+        return cmd_service_init(rest_args)
+
+    if command == "status":
+        return cmd_service_status(rest_args)
+
+    # Info commands
     if command == "modes":
         logger.info("Available modes:")
         for mode in list_modes():
             logger.info(f"  - {mode}")
         return 0
 
-    elif command == "backends":
+    if command == "backends":
         logger.info("Available backends:")
         for backend in list_backends():
             logger.info(f"  - {backend}")
         return 0
 
-    elif command == "compose":
-        # Run docker compose with all backends enabled
-        try:
-            mode = "dev"
-            if "--prod" in rest_args:
-                mode = "prod"
-                rest_args = [arg for arg in rest_args if arg != "--prod"]
+    if command == "services":
+        logger.info("Available services:")
+        for svc in available_services:
+            logger.info(f"  - {svc}")
+        return 0
 
-            compose_files = get_compose_files(mode=mode, include_kroki=True)
+    # Map service commands to docker compose
+    compose_cmd_map = {
+        "start": "up",
+        "stop": "down",
+        "build": "build",
+        "logs": "logs",
+        "ps": "ps",
+        "restart": "restart",
+    }
+
+    if command in compose_cmd_map:
+        try:
+            # Parse flags and extract service targets
+            mode = "dev"
+            include_kroki = command == "start"  # Default kroki for start
+            compose_args_extra = []
+            no_cache = False
+            target_services = []
+            kroki_port = None
+            mcp_port = None
+
+            i = 0
+            while i < len(rest_args):
+                arg = rest_args[i]
+                if arg == "--prod":
+                    mode = "prod"
+                elif arg == "--kroki":
+                    include_kroki = True
+                elif arg == "--no-kroki":
+                    include_kroki = False
+                elif arg in ("-d", "--detach"):
+                    compose_args_extra.append("-d")
+                elif arg == "--no-cache":
+                    no_cache = True
+                elif arg == "--kroki-port" and i + 1 < len(rest_args):
+                    kroki_port = rest_args[i + 1]
+                    i += 1
+                elif arg == "--mcp-port" and i + 1 < len(rest_args):
+                    mcp_port = rest_args[i + 1]
+                    i += 1
+                elif arg in available_services:
+                    target_services.append(arg)
+                elif not arg.startswith("-"):
+                    # Could be a service name for logs
+                    target_services.append(arg)
+                else:
+                    compose_args_extra.append(arg)
+                i += 1
+
+            # Set port environment variables if specified
+            if kroki_port:
+                os.environ["KROKI_PORT"] = kroki_port
+            if mcp_port:
+                os.environ["MCP_PORT"] = mcp_port
+
+            # Get compose files
+            compose_files = get_compose_files(mode=mode, include_kroki=include_kroki)
             compose_args = []
             for file in compose_files:
                 compose_args.extend(["-f", str(file)])
 
-            final_cmd = ["docker", "compose", *compose_args, *rest_args]
+            # Build final command
+            docker_cmd = compose_cmd_map[command]
+            final_cmd = ["docker", "compose", *compose_args, docker_cmd]
+
+            # Add command-specific options
+            if command == "start":
+                final_cmd.append("-d")
+            if command == "build" and no_cache:
+                final_cmd.append("--no-cache")
+
+            final_cmd.extend(compose_args_extra)
+
+            # Add target services at the end
+            final_cmd.extend(target_services)
+
+            # Log what we're doing
+            mode_str = f"Mode: {mode}" + (" + kroki" if include_kroki else "")
+            if kroki_port or mcp_port:
+                ports_str = []
+                if mcp_port:
+                    ports_str.append(f"MCP={mcp_port}")
+                if kroki_port:
+                    ports_str.append(f"Kroki={kroki_port}")
+                mode_str += f" (ports: {', '.join(ports_str)})"
+
+            logger.info(mode_str)
+            if target_services:
+                logger.info(f"Target: {', '.join(target_services)}")
             logger.info(f"Running: {' '.join(final_cmd)}")
 
             try:
@@ -1488,7 +2070,8 @@ def cmd_docker(extra_args: list[str]) -> int:
             return 1
 
     else:
-        logger.error(f"Unknown docker command: {command}")
+        logger.error(f"Unknown service command: {command}")
+        print("\nRun 'python . service' for usage information")
         return 1
 
 
@@ -1559,16 +2142,18 @@ def show_help() -> None:
     print("\n=== MCP Server Operations ===")
     print("  generate   Generate UI layouts from natural language")
     print("  search     Search vector indices for similar layouts")
-    print("  build      Manage Docker containers (start/stop services)")
-    print("  docker     Docker backend configuration")
+    print("  service    Manage MCP services (init, start, stop, status)")
     print("\n=== Development ===")
     print("  dev        Development workflows (test, benchmark, etc.)")
+    print("\nGetting Started:")
+    print("  python . service init               # First-time setup")
+    print("  python . service status             # Check service health")
     print("\nMCP Examples:")
     print("  python . generate 'login form with email and password'")
     print("  python . generate models")
     print("  python . search 'dashboard with sidebar' -k 3")
-    print("  python . build --kroki up            # Start Kroki renderer")
-    print("  python . build down                  # Stop services")
+    print("  python . service start              # Start services")
+    print("  python . service stop               # Stop services")
     print("\nDevelopment Examples:")
     print("  python . dev test --unit             # Run unit tests")
     print("  python . dev stats                   # Profile corpus data")
@@ -1596,8 +2181,7 @@ def main() -> int:
     mcp_commands = {
         "generate": lambda: handle_generate_command(rest_args),
         "search": lambda: handle_search_command(rest_args),
-        "build": lambda: cmd_build(rest_args),
-        "docker": lambda: cmd_docker(rest_args),
+        "service": lambda: cmd_service(rest_args),
     }
 
     # Development commands (nested under 'dev')
