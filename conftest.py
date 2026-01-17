@@ -72,8 +72,8 @@ def _is_kroki_healthy(url: str = KROKI_URL, timeout: float = 2.0) -> bool:
 
 def _get_compose_files() -> list[Path]:
     """Get the list of compose files for Kroki service."""
-    base = DOCKER_COMPOSE_DIR / "docker-compose.yml"
-    kroki = DOCKER_COMPOSE_DIR / "docker-compose.kroki.yml"
+    base = DOCKER_COMPOSE_DIR / "compose.base.yml"
+    kroki = DOCKER_COMPOSE_DIR / "compose.renderer.yml"
     files = []
     if base.exists():
         files.append(base)

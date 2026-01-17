@@ -1,8 +1,8 @@
-# Wireframe MCP: Layout Broker for AI-Assisted UI Design
+# wireframe-mcp: Layout Broker for AI-Assisted UI Design
 
 ## Vision
 
-**Wireframe MCP** is a Model Context Protocol (MCP) server that bridges the gap between natural language UI descriptions and verified structural blueprints. It addresses a fundamental limitation in LLM-based UI generation: the "stochastic gap" where direct code generation leads to structural hallucinations and non-deterministic layouts.
+**wireframe-mcp** is a Model Context Protocol (MCP) server that bridges the gap between natural language UI descriptions and verified structural blueprints. It addresses a fundamental limitation in LLM-based UI generation: the "stochastic gap" where direct code generation leads to structural hallucinations and non-deterministic layouts.
 
 Instead of letting LLMs generate raw HTML/React/CSS directly (where they often "imagine" impossible layouts), this system constrains LLM output to a strict Intermediate Representation (IR), validates it deterministically, and renders it to visual previews for human verification before any implementation code is written.
 

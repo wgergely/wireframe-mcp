@@ -19,6 +19,7 @@ from src.config import (
 )
 from src.core import get_logger, setup_logging
 from src.corpus.api import CorpusManager
+from src.docker.cli import handle_docker_command
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1898,19 +1899,14 @@ def cmd_service(extra_args: list[str]) -> int:
         KROKI_PORT,
         MCP_PORT,
         get_compose_files,
+        get_service_info,
         list_backends,
         list_modes,
+        list_services,
     )
 
-    # Available services for targeting
-    available_services = [
-        "wireframe-mcp",
-        "kroki",
-        "mermaid",
-        "bpmn",
-        "excalidraw",
-        "d2",
-    ]
+    # Build available services from docker module
+    available_services = [get_service_info(s).container_name for s in list_services()]
 
     if not extra_args:
         print("MCP Service Management")
@@ -1931,12 +1927,12 @@ def cmd_service(extra_args: list[str]) -> int:
         print("  --mcp-port PORT         Override MCP server port (default: 18080)")
         print(f"\nServices: {', '.join(available_services)}")
         print("\nExamples:")
-        print("  python . service init              # Complete first-time setup")
-        print("  python . service start             # Start all services")
-        print("  python . service start kroki       # Start only Kroki")
-        print("  python . service stop wireframe-mcp # Stop only MCP server")
-        print("  python . service build --no-cache  # Force rebuild images")
-        print("  python . service logs kroki        # View Kroki logs")
+        print("  python . service init                   # Complete first-time setup")
+        print("  python . service start                  # Start all services")
+        print("  python . service start wfmcp-kroki      # Start only Kroki")
+        print("  python . service stop wfmcp-server      # Stop only MCP server")
+        print("  python . service build --no-cache       # Force rebuild images")
+        print("  python . service logs wfmcp-kroki       # View Kroki logs")
         print(f"\nDefault ports: MCP={MCP_PORT}, Kroki={KROKI_PORT}")
         return 1
 
@@ -1964,9 +1960,15 @@ def cmd_service(extra_args: list[str]) -> int:
         return 0
 
     if command == "services":
+        from docker import list_services_by_category
+
         logger.info("Available services:")
-        for svc in available_services:
-            logger.info(f"  - {svc}")
+        for category, services in list_services_by_category().items():
+            if services:
+                logger.info(f"\n  {category.value.upper()}:")
+                for svc in services:
+                    info = get_service_info(svc)
+                    logger.info(f"    {info.container_name} - {info.description}")
         return 0
 
     # Map service commands to docker compose
@@ -2143,17 +2145,20 @@ def show_help() -> None:
     print("  generate   Generate UI layouts from natural language")
     print("  search     Search vector indices for similar layouts")
     print("  service    Manage MCP services (init, start, stop, status)")
+    print("  docker     Manage Docker stack (up, down, ps, build)")
     print("\n=== Development ===")
     print("  dev        Development workflows (test, benchmark, etc.)")
     print("\nGetting Started:")
     print("  python . service init               # First-time setup")
     print("  python . service status             # Check service health")
+    print("  python . docker up                  # Start Docker stack")
     print("\nMCP Examples:")
     print("  python . generate 'login form with email and password'")
     print("  python . generate models")
     print("  python . search 'dashboard with sidebar' -k 3")
     print("  python . service start              # Start services")
     print("  python . service stop               # Stop services")
+    print("  python . docker ps                  # Check Docker services")
     print("\nDevelopment Examples:")
     print("  python . dev test --unit             # Run unit tests")
     print("  python . dev stats                   # Profile corpus data")
@@ -2182,6 +2187,7 @@ def main() -> int:
         "generate": lambda: handle_generate_command(rest_args),
         "search": lambda: handle_search_command(rest_args),
         "service": lambda: cmd_service(rest_args),
+        "docker": lambda: handle_docker_command(rest_args),
     }
 
     # Development commands (nested under 'dev')

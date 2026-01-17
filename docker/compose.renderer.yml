@@ -1,0 +1,104 @@
+# Kroki rendering services
+#
+# This defines the Kroki gateway and all companion renderers:
+#   - wfmcp-kroki: Gateway service that routes to specialized renderers
+#   - wfmcp-kroki-d2: D2 diagram renderer
+#   - wfmcp-kroki-mermaid: Mermaid diagram renderer
+#   - wfmcp-kroki-bpmn: BPMN diagram renderer
+#   - wfmcp-kroki-excalidraw: Excalidraw whiteboard renderer
+#
+# Port Configuration (override via environment):
+#   KROKI_PORT - External port for Kroki API (default: 18000)
+#
+# Internal ports (not exposed externally):
+#   - mermaid: 8002
+#   - bpmn: 8003
+#   - excalidraw: 8004
+#   - d2: 8012
+#
+# Usage:
+#   docker compose -f compose.base.yml -f compose.renderer.yml up
+
+services:
+  # -------------------------------------------------------------------------
+  # wfmcp-kroki: Kroki gateway
+  # Converts D2/PlantUML/Mermaid/BPMN/Excalidraw to PNG/SVG
+  # Port 18000 chosen to avoid conflicts with common services:
+  #   - 8000: Django, FastAPI, Python HTTP servers
+  #   - 8080: Tomcat, Spring Boot, Jenkins
+  # -------------------------------------------------------------------------
+  wfmcp-kroki:
+    image: yuzutech/kroki
+    container_name: wfmcp-kroki
+    hostname: kroki
+    networks:
+      - wfmcp-network
+    ports:
+      - "${KROKI_PORT:-18000}:8000"
+    environment:
+      - KROKI_SAFE_MODE=unsafe
+      - KROKI_MAX_URI_LENGTH=8192
+      # Connect to companion renderers via hostname
+      - KROKI_MERMAID_HOST=mermaid
+      - KROKI_BPMN_HOST=bpmn
+      - KROKI_EXCALIDRAW_HOST=excalidraw
+      - KROKI_D2_HOST=d2
+    depends_on:
+      - wfmcp-kroki-d2
+      - wfmcp-kroki-mermaid
+      - wfmcp-kroki-bpmn
+      - wfmcp-kroki-excalidraw
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://localhost:8000/ || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # -------------------------------------------------------------------------
+  # Kroki companion renderers (internal only, not exposed)
+  # -------------------------------------------------------------------------
+  wfmcp-kroki-d2:
+    image: yuzutech/kroki-d2
+    container_name: wfmcp-kroki-d2
+    hostname: d2
+    networks:
+      - wfmcp-network
+    expose:
+      - "8012"
+    restart: unless-stopped
+
+  wfmcp-kroki-mermaid:
+    image: yuzutech/kroki-mermaid
+    container_name: wfmcp-kroki-mermaid
+    hostname: mermaid
+    networks:
+      - wfmcp-network
+    expose:
+      - "8002"
+    restart: unless-stopped
+
+  wfmcp-kroki-bpmn:
+    image: yuzutech/kroki-bpmn
+    container_name: wfmcp-kroki-bpmn
+    hostname: bpmn
+    networks:
+      - wfmcp-network
+    expose:
+      - "8003"
+    restart: unless-stopped
+
+  wfmcp-kroki-excalidraw:
+    image: yuzutech/kroki-excalidraw
+    container_name: wfmcp-kroki-excalidraw
+    hostname: excalidraw
+    networks:
+      - wfmcp-network
+    expose:
+      - "8004"
+    restart: unless-stopped
+
+networks:
+  wfmcp-network:
+    external: true

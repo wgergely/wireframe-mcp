@@ -7,9 +7,17 @@ from docker import (
     CORPUS_DATA_PATH,
     DOCKER_IMAGE_NAME,
     DOCKER_REGISTRY,
+    NETWORK_NAME,
+    PROJECT_NAME,
+    PROJECT_PREFIX,
+    Service,
+    ServiceCategory,
     get_compose_files,
+    get_service_info,
     list_backends,
     list_modes,
+    list_services,
+    list_services_by_category,
 )
 from docker.lib import get_container_path
 
@@ -33,6 +41,63 @@ class TestDockerConstants:
     def test_config_path(self) -> None:
         """Config path is a valid POSIX path."""
         assert str(CONFIG_PATH) == "/app/config"
+
+    def test_project_prefix(self) -> None:
+        """Project prefix follows convention."""
+        assert PROJECT_PREFIX == "wfmcp"
+
+    def test_project_name(self) -> None:
+        """Project name is correctly set."""
+        assert PROJECT_NAME == "wireframe-mcp"
+
+    def test_network_name(self) -> None:
+        """Network name uses project prefix."""
+        assert NETWORK_NAME == "wfmcp-network"
+
+
+@pytest.mark.unit
+class TestServiceEnums:
+    """Test Docker service enumeration."""
+
+    def test_service_enum_has_server(self) -> None:
+        """Service enum includes SERVER."""
+        assert Service.SERVER is not None
+
+    def test_service_enum_has_kroki(self) -> None:
+        """Service enum includes KROKI."""
+        assert Service.KROKI is not None
+
+    def test_get_service_info_returns_data(self) -> None:
+        """get_service_info returns ServiceInfo with expected fields."""
+        info = get_service_info(Service.SERVER)
+        assert info.container_name == "wfmcp-server"
+        assert info.category == ServiceCategory.CORE
+        assert info.internal_port == 18080
+
+    def test_kroki_service_info(self) -> None:
+        """Kroki service has correct metadata."""
+        info = get_service_info(Service.KROKI)
+        assert info.container_name == "wfmcp-kroki"
+        assert info.hostname == "kroki"
+        assert info.category == ServiceCategory.RENDERER
+
+    def test_list_services_returns_all(self) -> None:
+        """list_services returns all services."""
+        services = list_services()
+        assert len(services) == len(Service)
+
+    def test_list_services_by_category(self) -> None:
+        """list_services filters by category."""
+        core_services = list_services(ServiceCategory.CORE)
+        assert Service.SERVER in core_services
+        assert Service.KROKI not in core_services
+
+    def test_list_services_by_category_dict(self) -> None:
+        """list_services_by_category returns dict of all categories."""
+        grouped = list_services_by_category()
+        assert ServiceCategory.CORE in grouped
+        assert ServiceCategory.RENDERER in grouped
+        assert Service.SERVER in grouped[ServiceCategory.CORE]
 
 
 @pytest.mark.unit
@@ -65,9 +130,10 @@ class TestListModes:
         assert isinstance(modes, list)
 
     def test_list_modes_includes_dev_and_prod(self) -> None:
-        """list_modes includes dev and prod modes."""
+        """list_modes includes dev, hotreload, and prod modes."""
         modes = list_modes()
-        assert "dev" in modes
+        assert "dev" in modes  # backwards compat alias for hotreload
+        assert "hotreload" in modes
         assert "prod" in modes
 
     def test_list_modes_sorted(self) -> None:
@@ -78,17 +144,18 @@ class TestListModes:
 
 @pytest.mark.unit
 class TestListBackends:
-    """Test available docker-compose backends."""
+    """Test available docker-compose backends/services."""
 
     def test_list_backends_returns_list(self) -> None:
         """list_backends returns a list."""
         backends = list_backends()
         assert isinstance(backends, list)
 
-    def test_list_backends_includes_kroki(self) -> None:
-        """list_backends includes kroki backend."""
+    def test_list_backends_includes_kroki_and_server(self) -> None:
+        """list_backends includes kroki and server service files."""
         backends = list_backends()
         assert "kroki" in backends
+        assert "server" in backends
 
     def test_list_backends_sorted(self) -> None:
         """list_backends returns sorted list."""
@@ -106,14 +173,21 @@ class TestGetComposeFiles:
         assert isinstance(files, list)
         assert len(files) >= 1
         # Base file should be first
-        assert files[0].name == "docker-compose.yml"
+        assert files[0].name == "compose.base.yml"
 
     def test_get_compose_files_prod_mode(self) -> None:
         """Get compose files for prod mode."""
-        files = get_compose_files(mode="prod")
+        files = get_compose_files(mode="production")
         assert isinstance(files, list)
         assert len(files) >= 1
-        assert files[0].name == "docker-compose.yml"
+        assert files[0].name == "compose.base.yml"
+
+    def test_get_compose_files_hotreload_mode(self) -> None:
+        """Get compose files for hotreload mode."""
+        files = get_compose_files(mode="hotreload")
+        file_names = [f.name for f in files]
+        assert "compose.base.yml" in file_names
+        assert "compose.hotreload.yml" in file_names
 
     def test_get_compose_files_invalid_mode(self) -> None:
         """Invalid mode raises ValueError."""
@@ -123,26 +197,37 @@ class TestGetComposeFiles:
         except ValueError as e:
             assert "Invalid mode" in str(e)
 
-    def test_get_compose_files_with_kroki(self) -> None:
-        """Include kroki backend in compose files."""
-        files = get_compose_files(mode="dev", include_kroki=True)
+    def test_get_compose_files_includes_kroki_by_default(self) -> None:
+        """Kroki is included by default."""
+        files = get_compose_files(mode="dev")
         file_names = [f.name for f in files]
-        assert "docker-compose.yml" in file_names
-        assert "docker-compose.kroki.yml" in file_names
+        assert "compose.renderer.yml" in file_names
 
-    def test_get_compose_files_with_backends(self) -> None:
-        """Include additional backends in compose files."""
-        files = get_compose_files(mode="dev", include_backends=["kroki"])
+    def test_get_compose_files_without_kroki(self) -> None:
+        """Kroki can be excluded."""
+        files = get_compose_files(mode="dev", include_kroki=False)
         file_names = [f.name for f in files]
-        assert "docker-compose.yml" in file_names
-        assert "docker-compose.kroki.yml" in file_names
+        assert "compose.renderer.yml" not in file_names
+
+    def test_get_compose_files_includes_server_by_default(self) -> None:
+        """Server is included by default."""
+        files = get_compose_files(mode="dev")
+        file_names = [f.name for f in files]
+        assert "compose.core.yml" in file_names
+
+    def test_get_compose_files_without_server(self) -> None:
+        """Server can be excluded."""
+        files = get_compose_files(mode="dev", include_server=False)
+        file_names = [f.name for f in files]
+        assert "compose.core.yml" not in file_names
 
     def test_get_compose_files_order(self) -> None:
-        """Compose files are in correct order (base, mode, kroki, backends)."""
+        """Compose files are in correct order (base, server, kroki, mode)."""
         files = get_compose_files(mode="dev", include_kroki=True)
         file_names = [f.name for f in files]
-        # Base should come before mode-specific
-        base_idx = file_names.index("docker-compose.yml")
-        dev_idx = file_names.index("docker-compose.dev.yml")
-        kroki_idx = file_names.index("docker-compose.kroki.yml")
-        assert base_idx < dev_idx < kroki_idx
+        # Order: base, server, kroki, mode overlay
+        base_idx = file_names.index("compose.base.yml")
+        server_idx = file_names.index("compose.core.yml")
+        kroki_idx = file_names.index("compose.renderer.yml")
+        hotreload_idx = file_names.index("compose.hotreload.yml")
+        assert base_idx < server_idx < kroki_idx < hotreload_idx

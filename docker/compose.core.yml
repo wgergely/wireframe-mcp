@@ -1,0 +1,72 @@
+# MCP Server service definition
+#
+# This defines the main wireframe-mcp server.
+# Always use with compose.base.yml (base) and compose.renderer.yml
+#
+# Usage:
+# Usage:
+#   docker compose -f compose.base.yml -f compose.core.yml \
+#                  -f compose.renderer.yml up
+
+services:
+  # -------------------------------------------------------------------------
+  # wfmcp-server: Main MCP server
+  # -------------------------------------------------------------------------
+  wfmcp-server:
+    image: wireframe-mcp:latest
+    container_name: wfmcp-server
+    hostname: wfmcp-server
+    # GPU access for CUDA-accelerated embeddings and FAISS
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    networks:
+      - wfmcp-network
+    ports:
+      - "${MCP_PORT:-18080}:18080"
+    volumes:
+      # Named volumes for persistent data
+      - wfmcp-corpus-data:/app/corpus/data:rw
+      - wfmcp-corpus-models:/app/corpus/models:rw
+      - wfmcp-output:/app/data:rw
+    env_file:
+      # Secrets stored in main branch (worktree structure: ../main/.env)
+      # Falls back to local .env if running from main branch directly
+      - ../../main/.env
+    environment:
+      # Server configuration
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=18080
+      # Corpus paths (container paths)
+      - CORPUS_PATH=/app/corpus
+      - CORPUS_DATA_DIR=/app/corpus/data
+      - CORPUS_MODELS_DIR=/app/corpus/models
+      - CORPUS_INDEX_DIR=/app/corpus/index
+      # Kroki renderer URL (internal network hostname)
+      - KROKI_URL=http://kroki:${KROKI_PORT:-18000}
+      # Embedding backend
+      - EMBEDDING_BACKEND=local
+      # Logging
+      - LOG_LEVEL=INFO
+      # GPU support
+      - VECTOR_USE_GPU=true
+    depends_on:
+      wfmcp-kroki:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  wfmcp-network:
+    external: true
+
+volumes:
+  wfmcp-corpus-data:
+    external: true
+  wfmcp-corpus-models:
+    external: true
+  wfmcp-output:
+    external: true

@@ -81,16 +81,19 @@ USER mcp
 # Volume mount points for persistent data
 VOLUME ["/app/corpus", "/app/config", "/app/data"]
 
-# Environment variables
+# Environment variables (aligned with src/config defaults)
 ENV MCP_HOST=0.0.0.0 \
-    MCP_PORT=8080 \
+    MCP_PORT=18080 \
+    KROKI_PORT=18000 \
     CORPUS_PATH=/app/corpus \
     CORPUS_DATA_DIR=/app/corpus/data \
     CORPUS_MODELS_DIR=/app/corpus/models \
+    CORPUS_INDEX_DIR=/app/corpus/index \
+    EMBEDDING_BACKEND=local \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-EXPOSE 8080
+EXPOSE 18080
 
 # Dev mode: run with python -u for unbuffered output
 # The project uses __main__.py at root (run with `python .`)
@@ -125,16 +128,19 @@ USER mcp
 # Volume mount points for persistent data
 VOLUME ["/app/corpus", "/app/config", "/app/data"]
 
-# Environment variables
+# Environment variables (aligned with src/config defaults)
 ENV MCP_HOST=0.0.0.0 \
-    MCP_PORT=8080 \
+    MCP_PORT=18080 \
+    KROKI_PORT=18000 \
     CORPUS_PATH=/app/corpus \
     CORPUS_DATA_DIR=/app/corpus/data \
     CORPUS_MODELS_DIR=/app/corpus/models \
+    CORPUS_INDEX_DIR=/app/corpus/index \
+    EMBEDDING_BACKEND=local \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-EXPOSE 8080
+EXPOSE 18080
 
 # Healthcheck validates core module imports
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

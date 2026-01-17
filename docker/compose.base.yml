@@ -1,0 +1,52 @@
+# Base docker-compose configuration for wireframe-mcp
+#
+# This file defines project-level configuration: network, volumes.
+# Combine with service-specific compose files:
+#
+#   Development:
+#     docker compose -f compose.base.yml \
+#                    -f compose.core.yml \
+#                    -f compose.renderer.yml \
+#                    -f compose.hotreload.yml up
+#
+#   Production:
+#     docker compose -f compose.base.yml \
+#                    -f compose.core.yml \
+#                    -f compose.renderer.yml \
+#                    -f compose.production.yml up -d
+#
+# Port Configuration (override via environment):
+#   MCP_PORT     - MCP server port (default: 18080)
+#   KROKI_PORT   - Kroki renderer port (default: 18000)
+#
+# Naming Convention:
+#   Project prefix: wfmcp- (wireframe-mcp abbreviated)
+#   Services: wfmcp-server, wfmcp-kroki, wfmcp-kroki-{renderer}
+#   Network: wfmcp-network
+#   Volumes: wfmcp-corpus-data, wfmcp-corpus-models, wfmcp-output
+
+name: wireframe-mcp
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  wfmcp-network:
+    name: wfmcp-network
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Named Volumes for persistent data
+# ---------------------------------------------------------------------------
+volumes:
+  # Corpus dataset storage (RICO, ENRICO, WebSight, etc.)
+  wfmcp-corpus-data:
+    name: wfmcp-corpus-data
+
+  # Embedding models (sentence-transformers, etc.)
+  wfmcp-corpus-models:
+    name: wfmcp-corpus-models
+
+  # Output data (generated layouts, indices, benchmarks)
+  wfmcp-output:
+    name: wfmcp-output

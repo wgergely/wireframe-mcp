@@ -1,0 +1,54 @@
+# Development overrides for wireframe-mcp (hot reloading)
+#
+# Enables hot reloading by mounting source code as a volume.
+# Container name: wfmcp-server-hotreload (clearly identifies purpose)
+#
+# Features:
+#   - Source code mounted from host (changes immediately reflected)
+#   - Debug logging enabled
+#   - No rebuild required for code changes (only for dependency changes)
+#   - Container stays alive for interactive development
+#
+# Usage:
+#   docker compose -f compose.base.yml \
+#                  -f compose.core.yml \
+#                  -f compose.renderer.yml \
+#                  -f compose.hotreload.yml up --build
+#
+#   docker compose -f compose.base.yml \
+#                  -f compose.core.yml \
+#                  -f compose.renderer.yml \
+#                  -f compose.hotreload.yml run wfmcp-server test -v
+
+services:
+  wfmcp-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+    image: wireframe-mcp:hotreload
+    container_name: wfmcp-server-hotreload
+    # Keep container alive for interactive development
+    # Run commands with: docker exec wfmcp-server-hotreload python . {command}
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: [ "echo 'Hotreload container ready. Use docker exec to run commands.' && tail -f /dev/null" ]
+    volumes:
+      # Mount source code for hot reloading (overrides base volumes)
+      - ../src:/app/src:ro
+      - ../__main__.py:/app/__main__.py:ro
+      - ../conftest.py:/app/conftest.py:ro
+      - ../pytest.ini:/app/pytest.ini:ro
+      # Named volumes for persistent data (from base)
+      - wfmcp-corpus-data:/app/corpus/data:rw
+      - wfmcp-corpus-models:/app/corpus/models:rw
+      - wfmcp-output:/app/data:rw
+    environment:
+      - LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+    # Override healthcheck for faster dev iteration
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import src" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
