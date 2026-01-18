@@ -35,3 +35,7 @@ openai>=1.0.0
 # HTTP Client (for Kroki rendering)
 httpx>=0.25.0
 
+# MCP Server
+fastmcp>=2.0,<3
+pytest-asyncio>=0.23
+

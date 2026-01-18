@@ -2138,10 +2138,121 @@ def handle_stats_command(argv: list[str]) -> int:
     return handle_audit_command(argv)
 
 
+# =============================================================================
+# MCP Server Command
+# =============================================================================
+
+
+def handle_mcp_command(argv: list[str]) -> int:
+    """Handle MCP server commands.
+
+    Usage:
+        python . mcp run              # Start in STDIO mode (for Claude Desktop)
+        python . mcp serve            # Start in HTTP mode
+        python . mcp serve --port 8080
+        python . mcp info             # Show server info
+    """
+    if not argv:
+        print("MCP Server Commands")
+        print("\nUsage: python . mcp {command} [options]")
+        print("\nCommands:")
+        print("  run                 Start server in STDIO mode (for Claude Desktop)")
+        print("  serve               Start server in HTTP mode")
+        print("  info                Show server information")
+        print("\nOptions for 'serve':")
+        print("  --host HOST         Bind address (default: 0.0.0.0)")
+        print("  --port PORT         Port number (default: 18080)")
+        print("  --transport TYPE    Transport: http or sse (default: http)")
+        print("\nExamples:")
+        print("  python . mcp run                    # STDIO for Claude Desktop")
+        print("  python . mcp serve                  # HTTP on port 18080")
+        print("  python . mcp serve --port 8080     # HTTP on custom port")
+        print("\nClaude Desktop Configuration:")
+        print('  Add to claude_desktop_config.json:')
+        print('  {')
+        print('    "mcpServers": {')
+        print('      "wireframe": {')
+        print('        "command": "python",')
+        print('        "args": [".", "mcp", "run"],')
+        print('        "cwd": "/path/to/wireframe-mcp"')
+        print('      }')
+        print('    }')
+        print('  }')
+        return 1
+
+    subcommand = argv[0]
+    subargs = argv[1:]
+
+    if subcommand == "run":
+        # STDIO mode for Claude Desktop
+        from src.mcp.server import TransportType, run_server
+
+        logger.info("Starting MCP server in STDIO mode...")
+        run_server(transport=TransportType.STDIO)
+        return 0
+
+    elif subcommand == "serve":
+        # HTTP/SSE mode for web deployment
+        from src.mcp.server import TransportType, run_server
+
+        # Parse serve arguments
+        host = "0.0.0.0"
+        port = 18080
+        transport = TransportType.HTTP
+
+        i = 0
+        while i < len(subargs):
+            arg = subargs[i]
+            if arg == "--host" and i + 1 < len(subargs):
+                host = subargs[i + 1]
+                i += 2
+            elif arg == "--port" and i + 1 < len(subargs):
+                port = int(subargs[i + 1])
+                i += 2
+            elif arg == "--transport" and i + 1 < len(subargs):
+                transport = TransportType(subargs[i + 1])
+                i += 2
+            else:
+                i += 1
+
+        logger.info(f"Starting MCP server in {transport.value} mode...")
+        logger.info(f"Listening on {host}:{port}")
+        run_server(transport=transport, host=host, port=port)
+        return 0
+
+    elif subcommand == "info":
+        # Show server information
+        from src.mcp import get_server_capabilities, get_server_version
+
+        print("Wireframe MCP Server")
+        print("=" * 40)
+        print(f"Version: {get_server_version()}")
+        print("\nCapabilities:")
+        for cap, enabled in get_server_capabilities().items():
+            status = "enabled" if enabled else "disabled"
+            print(f"  {cap}: {status}")
+        print("\nAvailable Tools:")
+        print("  - ping: Health check")
+        print("  - get_server_info: Server metadata")
+        print("\nPlanned Tools (Phase 2):")
+        print("  - generate_layout: Generate UI layouts")
+        print("  - search_layouts: Search vector database")
+        print("  - render_layout: Render to PNG/SVG")
+        print("  - validate_layout: Validate structure")
+        print("  - transpile_layout: Convert to DSL")
+        return 0
+
+    else:
+        logger.error(f"Unknown mcp command: {subcommand}")
+        return handle_mcp_command([])
+
+
 def show_help() -> None:
     """Display CLI help message."""
     print("Usage: python . {command} [args]")
-    print("\n=== MCP Server Operations ===")
+    print("\n=== MCP Server ===")
+    print("  mcp        Run MCP server (STDIO or HTTP mode)")
+    print("\n=== MCP Operations ===")
     print("  generate   Generate UI layouts from natural language")
     print("  search     Search vector indices for similar layouts")
     print("  service    Manage MCP services (init, start, stop, status)")
@@ -2152,10 +2263,15 @@ def show_help() -> None:
     print("  python . service init               # First-time setup")
     print("  python . service status             # Check service health")
     print("  python . docker up                  # Start Docker stack")
-    print("\nMCP Examples:")
+    print("\nMCP Server:")
+    print("  python . mcp run                    # Start STDIO server (Claude Desktop)")
+    print("  python . mcp serve                  # Start HTTP server on port 18080")
+    print("  python . mcp info                   # Show server information")
+    print("\nLayout Generation:")
     print("  python . generate 'login form with email and password'")
     print("  python . generate models")
     print("  python . search 'dashboard with sidebar' -k 3")
+    print("\nService Management:")
     print("  python . service start              # Start services")
     print("  python . service stop               # Stop services")
     print("  python . docker ps                  # Check Docker services")
@@ -2184,6 +2300,7 @@ def main() -> int:
 
     # MCP server operations
     mcp_commands = {
+        "mcp": lambda: handle_mcp_command(rest_args),
         "generate": lambda: handle_generate_command(rest_args),
         "search": lambda: handle_search_command(rest_args),
         "service": lambda: cmd_service(rest_args),
