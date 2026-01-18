@@ -30,6 +30,49 @@ from .lib import (
 
 logger = logging.getLogger(__name__)
 
+# Valid output formats for rendering
+VALID_FORMATS = frozenset(("png", "svg"))
+
+
+# =============================================================================
+# Validation Helpers
+# =============================================================================
+
+
+def _get_valid_providers() -> frozenset[str]:
+    """Get valid provider names from registry."""
+    from src.providers import list_providers
+
+    return frozenset(list_providers())
+
+
+def _validate_provider(provider: str) -> None:
+    """Validate provider parameter against registry."""
+    valid = _get_valid_providers()
+    if provider not in valid:
+        raise ValueError(f"Invalid provider '{provider}'. Valid: {sorted(valid)}")
+
+
+def _validate_format(output_format: str) -> None:
+    """Validate output format parameter."""
+    if output_format not in VALID_FORMATS:
+        raise ValueError(
+            f"Invalid format '{output_format}'. Valid: {sorted(VALID_FORMATS)}"
+        )
+
+
+def _validate_temperature(temperature: float) -> None:
+    """Validate temperature parameter."""
+    if not 0.0 <= temperature <= 2.0:
+        raise ValueError(f"Temperature must be 0.0-2.0, got {temperature}")
+
+
+def _validate_k(k: int) -> None:
+    """Validate k (number of results) parameter."""
+    if not 1 <= k <= 20:
+        raise ValueError(f"k must be 1-20, got {k}")
+
+
 # =============================================================================
 # Server Instance
 # =============================================================================
@@ -76,8 +119,7 @@ def get_server_info() -> dict:
             "get_server_info",
             "generate_layout",
             "validate_layout",
-            "transpile_layout",
-            "render_layout",
+            "preview_layout",
             "search_layouts",
         ],
         "resources": [
@@ -105,8 +147,8 @@ def generate_layout(
     """Generate a UI layout from natural language description.
 
     This is the primary creation tool. It returns structured JSON and a
-    text tree representation for quick human review. Use render_layout
-    to get a visual preview, or transpile_layout to get DSL code.
+    draft text tree for quick human review. Use preview_layout to get
+    a visual wireframe image.
 
     Args:
         query: Natural language description of the desired layout.
@@ -122,7 +164,7 @@ def generate_layout(
     Returns:
         Dictionary with:
         - layout: Generated LayoutNode as JSON
-        - text_tree: Human-readable tree for quick review
+        - draft: Human-readable text tree for quick review
         - stats: Generation statistics
     """
     from .tools.generate import generate_layout as _generate
@@ -161,55 +203,34 @@ def validate_layout(
 
 
 @mcp.tool
-def transpile_layout(
+def preview_layout(
     layout: dict[str, Any],
-    provider: str = "d2",
-) -> dict[str, Any]:
-    """Convert a layout JSON to DSL code.
-
-    Transpiles the layout to D2 or PlantUML diagram notation.
-
-    Args:
-        layout: Layout JSON to transpile.
-        provider: Target DSL ("d2", "plantuml"). Default: "d2"
-
-    Returns:
-        Dictionary with:
-        - dsl_code: The transpiled DSL code
-        - provider: Provider used
-        - line_count: Lines in output
-    """
-    from .tools.transpile import transpile_layout as _transpile
-
-    return _transpile(layout=layout, provider=provider)
-
-
-@mcp.tool
-def render_layout(
-    layout: dict[str, Any],
+    style: str = "wireframe",
     format: str = "png",
-    provider: str = "plantuml",
 ) -> dict[str, Any]:
-    """Render a layout to an image.
+    """Render a layout to a visual wireframe image.
 
-    Converts the layout to DSL and renders via Kroki service.
-    Requires Kroki to be running.
+    Use this tool to see a visual preview of your layout.
+    Requires Kroki service to be running.
 
     Args:
         layout: Layout JSON to render.
+        style: Visual style. Options:
+            - "wireframe": Clean UI mockup (default)
+            - "sketch": Hand-drawn appearance
+            - "minimal": Simple boxes
         format: Output format ("png", "svg"). Default: "png"
-        provider: DSL provider ("d2", "plantuml"). Default: "plantuml"
 
     Returns:
         Dictionary with:
         - image_data: Base64-encoded image
         - format: Image format
+        - style: Visual style used
         - size_bytes: Image size
-        - provider: DSL provider used
     """
-    from .tools.render import render_layout as _render
+    from .tools.preview import preview_layout as _preview
 
-    return _render(layout=layout, format=format, provider=provider)
+    return _preview(layout=layout, style=style, format=format)
 
 
 @mcp.tool

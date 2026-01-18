@@ -19,11 +19,10 @@ Example:
 Available Tools:
     - ping: Health check
     - get_server_info: Server metadata
-    - generate_layout: Generate UI layouts from natural language
+    - generate_layout: Generate UI layouts from natural language (returns draft + JSON)
     - search_layouts: Search vector database for similar layouts
-    - render_layout: Render layouts to PNG/SVG
+    - preview_layout: Render layouts to PNG/SVG wireframe images
     - validate_layout: Validate layout structure
-    - transpile_layout: Convert layouts to DSL code
 """
 
 from .lib import (

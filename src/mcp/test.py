@@ -143,8 +143,11 @@ class TestToolRegistration:
     @pytest.mark.unit
     def test_get_server_info_tool_registered(self):
         """get_server_info tool is registered on server."""
-        # Similar to above
-        assert True  # Placeholder
+        from .server import get_server_info
+
+        # FastMCP wraps tools in FunctionTool, access underlying fn
+        result = get_server_info.fn()
+        assert "get_server_info" in result["tools"]
 
 
 # =============================================================================
@@ -160,7 +163,8 @@ class TestPingTool:
         """ping returns ok status."""
         from .server import ping
 
-        result = ping()
+        # FastMCP wraps tools in FunctionTool, access underlying fn
+        result = ping.fn()
 
         assert isinstance(result, dict)
         assert result["status"] == "ok"
@@ -172,7 +176,8 @@ class TestPingTool:
         """ping includes server version."""
         from .server import ping
 
-        result = ping()
+        # FastMCP wraps tools in FunctionTool, access underlying fn
+        result = ping.fn()
 
         assert result["version"] == get_server_version()
 
@@ -185,7 +190,8 @@ class TestGetServerInfoTool:
         """get_server_info returns proper structure."""
         from .server import get_server_info
 
-        result = get_server_info()
+        # FastMCP wraps tools in FunctionTool, access underlying fn
+        result = get_server_info.fn()
 
         assert isinstance(result, dict)
         assert result["name"] == "wireframe-mcp"
@@ -199,11 +205,13 @@ class TestGetServerInfoTool:
         """get_server_info includes tool list."""
         from .server import get_server_info
 
-        result = get_server_info()
+        # FastMCP wraps tools in FunctionTool, access underlying fn
+        result = get_server_info.fn()
 
         assert isinstance(result["tools"], list)
         assert "ping" in result["tools"]
         assert "get_server_info" in result["tools"]
+        assert "preview_layout" in result["tools"]  # Renamed from render_layout
 
 
 # =============================================================================

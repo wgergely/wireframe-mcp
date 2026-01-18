@@ -1,6 +1,7 @@
-"""Render layout tool for MCP server.
+"""Preview layout tool for MCP server.
 
-This tool renders layouts to PNG or SVG images via Kroki service.
+This tool renders layouts to PNG or SVG wireframe images via Kroki service.
+The style parameter abstracts away provider details from the user.
 """
 
 import base64
@@ -9,48 +10,66 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Style to provider mapping - abstracts implementation details
+STYLE_PROVIDERS: dict[str, tuple[str, dict[str, Any]]] = {
+    "wireframe": ("plantuml", {}),  # Clean UI mockups (default)
+    "sketch": ("d2", {"sketch": True}),  # Hand-drawn appearance
+    "minimal": ("d2", {}),  # Simple boxes
+}
 
-def render_layout(
+
+def preview_layout(
     layout: dict[str, Any],
+    style: str = "wireframe",
     format: str = "png",
-    provider: str = "plantuml",
 ) -> dict[str, Any]:
-    """Render a layout to an image.
+    """Render a layout to a visual wireframe image.
 
-    Converts the layout to DSL code and renders it using the Kroki
-    diagram service. Requires Kroki to be running (see docker compose).
+    Use this tool to see a visual preview of your layout. The style
+    parameter controls the visual appearance without exposing internal
+    diagram providers.
 
     Args:
         layout: Layout JSON to render. Should be the output from
             generate_layout or a manually constructed layout dict.
+        style: Visual style for the wireframe. Options:
+            - "wireframe": Clean UI mockup (default, best for app/web interfaces)
+            - "sketch": Hand-drawn appearance (good for early concepts)
+            - "minimal": Simple boxes (good for architecture diagrams)
         format: Output image format. Options:
             - "png": PNG image (default, best for previews)
             - "svg": SVG vector image (scalable, good for docs)
-        provider: DSL provider for rendering. Options:
-            - "plantuml": PlantUML Salt notation (default, better wireframes)
-            - "d2": D2 diagram language (better for architecture)
 
     Returns:
         Dictionary containing:
         - image_data: Base64-encoded image data
         - format: Image format used
+        - style: Visual style used
         - size_bytes: Image size in bytes
-        - provider: DSL provider used
 
     Raises:
-        ToolError: If Kroki service is unavailable or rendering fails.
+        ValueError: If style or format is invalid.
+        RuntimeError: If Kroki service is unavailable or rendering fails.
 
     Example:
-        >>> result = render_layout(layout, format="png")
+        >>> result = preview_layout(layout, style="wireframe")
         >>> # Decode and save:
         >>> import base64
-        >>> with open("output.png", "wb") as f:
+        >>> with open("preview.png", "wb") as f:
         ...     f.write(base64.b64decode(result["image_data"]))
     """
     from pydantic import ValidationError as PydanticValidationError
 
     from src.mid import LayoutNode
     from src.render import OutputFormat, RenderClient, RenderConfig, RenderError
+
+    # Validate style
+    if style not in STYLE_PROVIDERS:
+        valid_styles = sorted(STYLE_PROVIDERS.keys())
+        raise ValueError(f"Invalid style: {style}. Options: {', '.join(valid_styles)}")
+
+    # Get provider configuration from style
+    provider, provider_options = STYLE_PROVIDERS[style]
 
     # Validate format
     try:
@@ -81,8 +100,8 @@ def render_layout(
     )
 
     try:
-        # Render
-        logger.info(f"Rendering layout with {provider} to {format}")
+        # Render using internal provider
+        logger.info(f"Rendering preview with style={style} ({provider}) to {format}")
         result = client.render_layout(node, provider=provider, config=config)
 
         # Encode image as base64
@@ -91,8 +110,8 @@ def render_layout(
         return {
             "image_data": image_b64,
             "format": format,
+            "style": style,
             "size_bytes": result.size_bytes,
-            "provider": provider,
         }
 
     except RenderError as e:
@@ -100,4 +119,4 @@ def render_layout(
         raise RuntimeError(f"Rendering failed: {e}") from e
 
 
-__all__ = ["render_layout"]
+__all__ = ["preview_layout", "STYLE_PROVIDERS"]

@@ -1,7 +1,7 @@
 """Generate layout tool for MCP server.
 
 This tool generates UI layouts from natural language descriptions,
-returning structured JSON and a text tree for quick review.
+returning structured JSON and a draft text tree for quick review.
 """
 
 import logging
@@ -22,8 +22,8 @@ def generate_layout(
     """Generate a UI layout from natural language description.
 
     This is the primary creation tool. It returns structured JSON and a
-    text tree representation for quick human review. Use render_layout
-    to get a visual preview, or transpile_layout to get DSL code.
+    draft text tree for quick human review. Use preview_layout to get
+    a visual wireframe image.
 
     Args:
         query: Natural language description of the desired layout.
@@ -38,7 +38,7 @@ def generate_layout(
             If not specified, uses the first available provider.
         temperature: Generation temperature (0.0-2.0). Higher values
             produce more creative/varied outputs. Default: 0.7
-        provider: Target DSL provider for text_tree hints.
+        provider: Target DSL provider for rendering hints.
             Options: "d2", "plantuml". Default: "d2"
         include_rag: Whether to include similar layouts from vector
             store as context for generation. Default: True
@@ -46,7 +46,7 @@ def generate_layout(
     Returns:
         Dictionary containing:
         - layout: The generated LayoutNode as a JSON dict
-        - text_tree: Human-readable tree representation for quick review
+        - draft: Human-readable text tree for quick review
         - stats: Generation statistics (attempts, tokens, model used)
 
     Raises:
@@ -54,7 +54,7 @@ def generate_layout(
 
     Example:
         >>> result = generate_layout("login form with email and password")
-        >>> print(result["text_tree"])
+        >>> print(result["draft"])
         Login [container]
         └── Form [card]
             ├── Email [input]
@@ -111,11 +111,11 @@ def generate_layout(
 
         # Build response
         layout_dict = output.context.node.model_dump(mode="json")
-        text_tree = format_layout_tree(output.context.node)
+        draft = format_layout_tree(output.context.node)
 
         return {
             "layout": layout_dict,
-            "text_tree": text_tree,
+            "draft": draft,
             "stats": {
                 "attempts": output.stats.attempts,
                 "tokens": output.stats.total_tokens,

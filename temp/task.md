@@ -335,14 +335,24 @@ src/mcp/
 
 ## Progress Log
 
+### 2026-01-18 - Phase 2 Refactored
+
+- **Tool API Simplified for Developer Workflow**
+  - Renamed `text_tree` output to `draft` in generate_layout (clearer purpose)
+  - Renamed `render_layout` to `preview_layout` with style abstraction
+  - Internalized `transpile_layout` (removed from public API)
+  - Added style parameter: "wireframe", "sketch", "minimal" (abstracts providers)
+  - Created `src/mcp/DEVELOPER_GUIDE.md` documenting the workflow
+  - Created `temp/refactor-plan.md` with implementation details
+  - Updated tests to work with fastmcp FunctionTool wrapper
+
 ### 2026-01-18 - Phase 2 Complete
 
 - **MCP Tools & Resources implemented**
-  - Created `src/mcp/tools/` module with 5 tool implementations
-  - `generate_layout`: NL → JSON + text_tree (workflow-driven design)
+  - Created `src/mcp/tools/` module with 4 public tool implementations
+  - `generate_layout`: NL → JSON + draft (workflow-driven design)
   - `validate_layout`: Structure validation with errors/warnings
-  - `transpile_layout`: JSON → D2/PlantUML DSL
-  - `render_layout`: Layout → PNG/SVG via Kroki
+  - `preview_layout`: Layout → PNG/SVG wireframe via Kroki
   - `search_layouts`: Vector similarity search
   - Added 4 MCP resources (schema://*, config://*)
   - Created workflow design doc: `temp/mcp-workflow-design.md`
