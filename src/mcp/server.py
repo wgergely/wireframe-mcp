@@ -18,11 +18,11 @@ Usage:
 import argparse
 import logging
 import sys
+from typing import Any
 
 from fastmcp import FastMCP
 
 from .lib import (
-    ServerConfig,
     TransportType,
     get_server_capabilities,
     get_server_version,
@@ -41,7 +41,7 @@ mcp = FastMCP(
 
 
 # =============================================================================
-# Health Check Tool (for testing server connectivity)
+# Health Check Tools
 # =============================================================================
 
 
@@ -74,14 +74,264 @@ def get_server_info() -> dict:
         "tools": [
             "ping",
             "get_server_info",
-            # Phase 2 tools (to be implemented):
-            # "generate_layout",
-            # "search_layouts",
-            # "render_layout",
-            # "validate_layout",
-            # "transpile_layout",
+            "generate_layout",
+            "validate_layout",
+            "transpile_layout",
+            "render_layout",
+            "search_layouts",
+        ],
+        "resources": [
+            "schema://components",
+            "schema://layout",
+            "config://models",
+            "config://providers",
         ],
     }
+
+
+# =============================================================================
+# Layout Tools
+# =============================================================================
+
+
+@mcp.tool
+def generate_layout(
+    query: str,
+    model: str | None = None,
+    temperature: float = 0.7,
+    provider: str = "d2",
+    include_rag: bool = True,
+) -> dict[str, Any]:
+    """Generate a UI layout from natural language description.
+
+    This is the primary creation tool. It returns structured JSON and a
+    text tree representation for quick human review. Use render_layout
+    to get a visual preview, or transpile_layout to get DSL code.
+
+    Args:
+        query: Natural language description of the desired layout.
+            Examples:
+            - "login form with email and password"
+            - "dashboard with sidebar and main content area"
+            - "settings page with toggle switches"
+        model: LLM model to use. If not specified, uses default.
+        temperature: Generation temperature (0.0-2.0). Default: 0.7
+        provider: Target DSL provider ("d2", "plantuml"). Default: "d2"
+        include_rag: Include similar layouts as context. Default: True
+
+    Returns:
+        Dictionary with:
+        - layout: Generated LayoutNode as JSON
+        - text_tree: Human-readable tree for quick review
+        - stats: Generation statistics
+    """
+    from .tools.generate import generate_layout as _generate
+
+    return _generate(
+        query=query,
+        model=model,
+        temperature=temperature,
+        provider=provider,
+        include_rag=include_rag,
+    )
+
+
+@mcp.tool
+def validate_layout(
+    layout: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate a layout structure for errors.
+
+    Checks for structural issues like duplicate IDs, invalid flex ratios,
+    cycles, and component-specific constraints.
+
+    Args:
+        layout: Layout JSON to validate.
+
+    Returns:
+        Dictionary with:
+        - valid: Boolean indicating if layout passes all checks
+        - errors: List of error objects
+        - warnings: List of warning objects
+        - stats: Structural statistics
+    """
+    from .tools.validate import validate_layout as _validate
+
+    return _validate(layout=layout)
+
+
+@mcp.tool
+def transpile_layout(
+    layout: dict[str, Any],
+    provider: str = "d2",
+) -> dict[str, Any]:
+    """Convert a layout JSON to DSL code.
+
+    Transpiles the layout to D2 or PlantUML diagram notation.
+
+    Args:
+        layout: Layout JSON to transpile.
+        provider: Target DSL ("d2", "plantuml"). Default: "d2"
+
+    Returns:
+        Dictionary with:
+        - dsl_code: The transpiled DSL code
+        - provider: Provider used
+        - line_count: Lines in output
+    """
+    from .tools.transpile import transpile_layout as _transpile
+
+    return _transpile(layout=layout, provider=provider)
+
+
+@mcp.tool
+def render_layout(
+    layout: dict[str, Any],
+    format: str = "png",
+    provider: str = "plantuml",
+) -> dict[str, Any]:
+    """Render a layout to an image.
+
+    Converts the layout to DSL and renders via Kroki service.
+    Requires Kroki to be running.
+
+    Args:
+        layout: Layout JSON to render.
+        format: Output format ("png", "svg"). Default: "png"
+        provider: DSL provider ("d2", "plantuml"). Default: "plantuml"
+
+    Returns:
+        Dictionary with:
+        - image_data: Base64-encoded image
+        - format: Image format
+        - size_bytes: Image size
+        - provider: DSL provider used
+    """
+    from .tools.render import render_layout as _render
+
+    return _render(layout=layout, format=format, provider=provider)
+
+
+@mcp.tool
+def search_layouts(
+    query: str,
+    k: int = 5,
+    source_filter: str | None = None,
+) -> dict[str, Any]:
+    """Search for similar layouts in the vector database.
+
+    Finds layouts semantically similar to the query. Useful for
+    inspiration or understanding existing patterns.
+
+    Args:
+        query: Natural language description of desired layout.
+        k: Number of results (1-20). Default: 5
+        source_filter: Filter by corpus source (optional).
+
+    Returns:
+        Dictionary with:
+        - results: List of similar layouts with scores
+        - total_in_index: Total items in index
+        - query: Original query
+    """
+    from .tools.search import search_layouts as _search
+
+    return _search(query=query, k=k, source_filter=source_filter)
+
+
+# =============================================================================
+# Resources
+# =============================================================================
+
+
+@mcp.resource("schema://components")
+def get_component_schema() -> str:
+    """Get the component type catalog.
+
+    Returns JSON schema describing all 26 UI component types
+    with their categories, constraints, and metadata.
+    """
+    from src.schema import export_llm_schema
+
+    return export_llm_schema()
+
+
+@mcp.resource("schema://layout")
+def get_layout_schema() -> str:
+    """Get the LayoutNode JSON schema.
+
+    Returns the full JSON schema for LayoutNode structures,
+    including all fields, types, and constraints.
+    """
+    import json
+
+    from src.mid import LayoutNode
+
+    schema = LayoutNode.model_json_schema()
+    return json.dumps(schema, indent=2)
+
+
+@mcp.resource("config://models")
+def get_available_models() -> str:
+    """Get list of available LLM models.
+
+    Returns information about LLM models that can be used
+    with generate_layout, including which are currently available.
+    """
+    import json
+
+    from src.config import get_available_llm_providers
+
+    available_providers = get_available_llm_providers()
+
+    try:
+        from src.llm import LLMModel
+
+        models = []
+        for model in LLMModel:
+            models.append(
+                {
+                    "name": model.spec.name,
+                    "provider": model.spec.provider,
+                    "available": model.spec.provider in available_providers,
+                }
+            )
+        return json.dumps(
+            {
+                "models": models,
+                "available_providers": available_providers,
+            }
+        )
+    except ImportError:
+        return json.dumps({"available_providers": available_providers})
+
+
+@mcp.resource("config://providers")
+def get_available_providers() -> str:
+    """Get list of available DSL providers.
+
+    Returns information about transpilation providers (D2, PlantUML)
+    and corpus providers (Rico, Enrico, etc.).
+    """
+    import json
+
+    from src.providers import list_providers
+
+    dsl_providers = list_providers()
+
+    try:
+        from src.corpus.api import CorpusManager
+
+        corpus_providers = CorpusManager().list_providers()
+    except ImportError:
+        corpus_providers = []
+
+    return json.dumps(
+        {
+            "dsl_providers": dsl_providers,
+            "corpus_providers": corpus_providers,
+        }
+    )
 
 
 # =============================================================================
@@ -89,17 +339,12 @@ def get_server_info() -> dict:
 # =============================================================================
 
 
-def create_server(config: ServerConfig | None = None) -> FastMCP:
+def create_server() -> FastMCP:
     """Create and configure the MCP server instance.
-
-    Args:
-        config: Optional server configuration.
 
     Returns:
         Configured FastMCP server instance.
     """
-    # The global mcp instance is already configured
-    # This function exists for testing and custom configuration
     return mcp
 
 

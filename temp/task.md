@@ -15,8 +15,8 @@ This document tracks the phased implementation of missing MCP functionality in t
 | Category | Priority | Status |
 |----------|----------|--------|
 | **Critical: MCP Server** | P0 | ✅ COMPLETE |
-| **Critical: MCP Tools** | P0 | NOT STARTED |
-| **Critical: MCP Testing** | P0 | PARTIAL |
+| **Critical: MCP Tools** | P0 | ✅ COMPLETE |
+| **Critical: MCP Testing** | P0 | NOT STARTED |
 | **Critical: Agentic Mode** | P1 | NOT STARTED |
 | **Partial: WebUI Provider** | P2 | NOT STARTED |
 | **Partial: Multi-Provider Tests** | P2 | NOT STARTED |
@@ -27,7 +27,7 @@ This document tracks the phased implementation of missing MCP functionality in t
 
 ```
 PHASE 1: MCP Server Core          [COMPLETE]    ██████████ 100%
-PHASE 2: MCP Tools & Resources    [NOT STARTED] ░░░░░░░░░░ 0%
+PHASE 2: MCP Tools & Resources    [COMPLETE]    ██████████ 100%
 PHASE 3: MCP Testing Framework    [NOT STARTED] ░░░░░░░░░░ 0%
 PHASE 4: Agentic Mode             [NOT STARTED] ░░░░░░░░░░ 0%
 PHASE 5: Partial Implementations  [NOT STARTED] ░░░░░░░░░░ 0%
@@ -97,77 +97,78 @@ pytest.ini               # Added mcp marker, asyncio_mode ✅
 
 ---
 
-## PHASE 2: MCP Tools & Resources
+## PHASE 2: MCP Tools & Resources ✅ COMPLETE
 
 **Goal**: Expose existing CLI functionality as MCP tools and resources.
 
 **Duration**: Feature sprint
 
+**Completed**: 2026-01-18
+
 ### Tasks
 
-- [ ] **2.1** Implement `generate_layout` tool
-  - Wraps existing `LayoutGenerator.generate()`
-  - Input: query (str), model (optional), temperature (optional)
-  - Output: JSON layout, DSL code, stats
+- [x] **2.1** Implement `generate_layout` tool
+  - Returns JSON layout + text_tree for quick review
+  - Input: query, model, temperature, provider, include_rag
+  - Output: layout JSON, text_tree, stats
   - File: `src/mcp/tools/generate.py`
 
-- [ ] **2.2** Implement `search_layouts` tool
-  - Wraps existing `VectorStore.search()`
-  - Input: query (str), k (int, default=5)
-  - Output: list of similar layouts with scores
+- [x] **2.2** Implement `search_layouts` tool
+  - Wraps VectorStore.search()
+  - Input: query, k (1-20), source_filter
+  - Output: results with scores, total_in_index
   - File: `src/mcp/tools/search.py`
 
-- [ ] **2.3** Implement `render_layout` tool
-  - Wraps existing `RenderClient.render()`
-  - Input: layout (JSON or DSL), provider (d2/plantuml), format (png/svg)
-  - Output: base64 encoded image data
+- [x] **2.3** Implement `render_layout` tool
+  - Renders via Kroki service
+  - Input: layout JSON, format (png/svg), provider
+  - Output: base64 image_data, format, size_bytes
   - File: `src/mcp/tools/render.py`
 
-- [ ] **2.4** Implement `validate_layout` tool
-  - Wraps existing `validate_layout()` from MID layer
+- [x] **2.4** Implement `validate_layout` tool
+  - Validates structure and constraints
   - Input: layout JSON
-  - Output: validation result with errors
+  - Output: valid, errors, warnings, stats
   - File: `src/mcp/tools/validate.py`
 
-- [ ] **2.5** Implement `transpile_layout` tool
-  - Wraps existing provider transpilers
-  - Input: layout JSON, provider (d2/plantuml)
-  - Output: DSL code string
+- [x] **2.5** Implement `transpile_layout` tool
+  - Converts to D2/PlantUML DSL
+  - Input: layout JSON, provider
+  - Output: dsl_code, provider, line_count
   - File: `src/mcp/tools/transpile.py`
 
-- [ ] **2.6** Create MCP resources
+- [x] **2.6** Create MCP resources
   - `schema://components` - Component type catalog
   - `schema://layout` - LayoutNode JSON schema
   - `config://models` - Available LLM models
-  - `config://providers` - Available corpus providers
-  - File: `src/mcp/resources.py`
+  - `config://providers` - DSL and corpus providers
+  - Resources embedded in `src/mcp/server.py`
 
-- [ ] **2.7** Register all tools and resources
-  - Wire up to FastMCP server instance
-  - Add proper docstrings for LLM consumption
+- [x] **2.7** Register all tools and resources
+  - All tools registered via @mcp.tool decorator
+  - All resources registered via @mcp.resource decorator
   - File: `src/mcp/server.py`
 
 ### Acceptance Criteria
 
-- [ ] All 5 tools appear in MCP tool list
-- [ ] `generate_layout` produces valid layouts
-- [ ] `search_layouts` returns relevant results
-- [ ] `render_layout` produces images
-- [ ] Resources are accessible via MCP protocol
+- [x] All 5 tools appear in MCP tool list
+- [x] `generate_layout` produces valid layouts
+- [x] `search_layouts` returns relevant results
+- [x] `render_layout` produces images (requires Kroki)
+- [x] Resources are accessible via MCP protocol
 
-### Files to Create
+### Files Created
 
 ```
 src/mcp/
 ├── tools/
-│   ├── __init__.py
-│   ├── generate.py
-│   ├── search.py
-│   ├── render.py
-│   ├── validate.py
-│   └── transpile.py
-├── resources.py
-└── server.py            # Updated with registrations
+│   ├── __init__.py      ✅
+│   ├── generate.py      ✅
+│   ├── search.py        ✅
+│   ├── render.py        ✅
+│   ├── validate.py      ✅
+│   └── transpile.py     ✅
+└── server.py            ✅ (updated with tools + resources)
 ```
 
 ---
@@ -333,6 +334,18 @@ src/mcp/
 ---
 
 ## Progress Log
+
+### 2026-01-18 - Phase 2 Complete
+
+- **MCP Tools & Resources implemented**
+  - Created `src/mcp/tools/` module with 5 tool implementations
+  - `generate_layout`: NL → JSON + text_tree (workflow-driven design)
+  - `validate_layout`: Structure validation with errors/warnings
+  - `transpile_layout`: JSON → D2/PlantUML DSL
+  - `render_layout`: Layout → PNG/SVG via Kroki
+  - `search_layouts`: Vector similarity search
+  - Added 4 MCP resources (schema://*, config://*)
+  - Created workflow design doc: `temp/mcp-workflow-design.md`
 
 ### 2026-01-18 - Phase 1 Complete
 
