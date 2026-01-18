@@ -126,6 +126,8 @@ def get_server_info() -> dict:
             "search_layouts",
             "get_history",
             "get_artifact",
+            "get_sessions",
+            "get_variation_set",
             "get_storage_stats",
         ],
         "resources": [
@@ -268,34 +270,29 @@ def validate_layout(
 @mcp.tool
 def preview_layout(
     layout: dict[str, Any],
-    style: str = "wireframe",
     output_format: str = "png",
 ) -> dict[str, Any]:
-    """Render a layout to a visual wireframe image.
+    """Render a layout to a wireframe image.
 
-    Use this tool to see a visual preview of your layout.
-    Requires Kroki service to be running.
+    Converts the layout JSON to a visual wireframe via Kroki service.
+    Provider is configured via environment (MCP_PREVIEW_PROVIDER).
 
     Args:
         layout: Layout JSON to render.
-        style: Visual style. Options:
-            - "wireframe": Clean UI mockup (default)
-            - "sketch": Hand-drawn appearance
-            - "minimal": Simple boxes
         output_format: Output format ("png", "svg"). Default: "png"
 
     Returns:
         Dictionary with:
         - image_data: Base64-encoded image
         - format: Image format
-        - style: Visual style used
+        - provider: Rendering provider used
         - size_bytes: Image size
     """
     _validate_format(output_format)
 
     from .tools.preview import preview_layout as _preview
 
-    return _preview(layout=layout, style=style, output_format=output_format)
+    return _preview(layout=layout, output_format=output_format)
 
 
 @mcp.tool
@@ -398,6 +395,54 @@ def get_storage_stats() -> dict[str, Any]:
     from .tools.history import get_storage_stats as _get_storage_stats
 
     return _get_storage_stats()
+
+
+@mcp.tool
+def get_sessions(
+    limit: int = 20,
+    offset: int = 0,
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    """List available sessions.
+
+    Sessions group related layout generations together.
+
+    Args:
+        limit: Maximum results (1-50). Default: 20
+        offset: Number of results to skip. Default: 0
+        tags: Filter by tags (optional).
+
+    Returns:
+        Dictionary with:
+        - sessions: List of session summaries
+        - total_count: Total sessions
+    """
+    from .tools.history import get_sessions as _get_sessions
+
+    return _get_sessions(limit=limit, offset=offset, tags=tags)
+
+
+@mcp.tool
+def get_variation_set(
+    set_id: str,
+) -> dict[str, Any]:
+    """Retrieve a variation set with all its artifacts.
+
+    A variation set groups multiple layout variations generated
+    from the same query with different temperatures.
+
+    Args:
+        set_id: The variation set UUID.
+
+    Returns:
+        Dictionary with:
+        - variation_set: Set metadata (query, count, diversity_score)
+        - artifacts: List of artifact summaries
+        - comparison: Comparison metrics between variations
+    """
+    from .tools.history import get_variation_set as _get_variation_set
+
+    return _get_variation_set(set_id=set_id)
 
 
 # =============================================================================
