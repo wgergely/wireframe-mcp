@@ -215,6 +215,90 @@ class TestGetServerInfoTool:
 
 
 # =============================================================================
+# Validation Tests
+# =============================================================================
+
+
+class TestValidationHelpers:
+    """Tests for parameter validation functions."""
+
+    @pytest.mark.unit
+    def test_validate_temperature_valid(self):
+        """Valid temperatures don't raise."""
+        from .server import _validate_temperature
+
+        _validate_temperature(0.0)
+        _validate_temperature(1.0)
+        _validate_temperature(2.0)
+        _validate_temperature(0.7)
+
+    @pytest.mark.unit
+    def test_validate_temperature_invalid(self):
+        """Invalid temperatures raise ValueError."""
+        from .server import _validate_temperature
+
+        with pytest.raises(ValueError, match="Temperature must be"):
+            _validate_temperature(-0.1)
+        with pytest.raises(ValueError, match="Temperature must be"):
+            _validate_temperature(2.1)
+
+    @pytest.mark.unit
+    def test_validate_k_valid(self):
+        """Valid k values don't raise."""
+        from .server import _validate_k
+
+        _validate_k(1)
+        _validate_k(5)
+        _validate_k(20)
+
+    @pytest.mark.unit
+    def test_validate_k_invalid(self):
+        """Invalid k values raise ValueError."""
+        from .server import _validate_k
+
+        with pytest.raises(ValueError, match="k must be"):
+            _validate_k(0)
+        with pytest.raises(ValueError, match="k must be"):
+            _validate_k(21)
+
+    @pytest.mark.unit
+    def test_validate_format_valid(self):
+        """Valid formats don't raise."""
+        from .server import _validate_format
+
+        _validate_format("png")
+        _validate_format("svg")
+
+    @pytest.mark.unit
+    def test_validate_format_invalid(self):
+        """Invalid formats raise ValueError."""
+        from .server import _validate_format
+
+        with pytest.raises(ValueError, match="Invalid format"):
+            _validate_format("gif")
+        with pytest.raises(ValueError, match="Invalid format"):
+            _validate_format("jpg")
+
+    @pytest.mark.unit
+    def test_validate_provider_valid(self):
+        """Valid providers don't raise."""
+        from .server import _validate_provider
+
+        _validate_provider("d2")
+        _validate_provider("plantuml")
+
+    @pytest.mark.unit
+    def test_validate_provider_invalid(self):
+        """Invalid providers raise ValueError."""
+        from .server import _validate_provider
+
+        with pytest.raises(ValueError, match="Invalid provider"):
+            _validate_provider("unknown")
+        with pytest.raises(ValueError, match="Invalid provider"):
+            _validate_provider("mermaid")
+
+
+# =============================================================================
 # MCP Protocol Integration Tests (require async)
 # =============================================================================
 

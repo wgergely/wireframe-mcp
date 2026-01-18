@@ -21,7 +21,7 @@ STYLE_PROVIDERS: dict[str, tuple[str, dict[str, Any]]] = {
 def preview_layout(
     layout: dict[str, Any],
     style: str = "wireframe",
-    format: str = "png",
+    output_format: str = "png",
 ) -> dict[str, Any]:
     """Render a layout to a visual wireframe image.
 
@@ -36,7 +36,7 @@ def preview_layout(
             - "wireframe": Clean UI mockup (default, best for app/web interfaces)
             - "sketch": Hand-drawn appearance (good for early concepts)
             - "minimal": Simple boxes (good for architecture diagrams)
-        format: Output image format. Options:
+        output_format: Output image format. Options:
             - "png": PNG image (default, best for previews)
             - "svg": SVG vector image (scalable, good for docs)
 
@@ -73,10 +73,10 @@ def preview_layout(
 
     # Validate format
     try:
-        output_format = OutputFormat(format.lower())
+        fmt = OutputFormat(output_format.lower())
     except ValueError as e:
         raise ValueError(
-            f"Invalid format: {format}. Options: png, svg, pdf, jpeg"
+            f"Invalid format: {output_format}. Options: png, svg, pdf, jpeg"
         ) from e
 
     # Parse layout
@@ -96,12 +96,12 @@ def preview_layout(
 
     # Configure rendering
     config = RenderConfig(
-        output_format=output_format,
+        output_format=fmt,
     )
 
     try:
         # Render using internal provider
-        logger.info(f"Rendering preview with style={style} ({provider}) to {format}")
+        logger.info(f"Rendering: {style}/{provider} -> {output_format}")
         result = client.render_layout(node, provider=provider, config=config)
 
         # Encode image as base64
@@ -109,7 +109,7 @@ def preview_layout(
 
         return {
             "image_data": image_b64,
-            "format": format,
+            "format": output_format,
             "style": style,
             "size_bytes": result.size_bytes,
         }

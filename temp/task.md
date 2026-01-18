@@ -16,6 +16,7 @@ This document tracks the phased implementation of missing MCP functionality in t
 |----------|----------|--------|
 | **Critical: MCP Server** | P0 | ✅ COMPLETE |
 | **Critical: MCP Tools** | P0 | ✅ COMPLETE |
+| **Critical: History Manager** | P0 | DESIGN COMPLETE |
 | **Critical: MCP Testing** | P0 | NOT STARTED |
 | **Critical: Agentic Mode** | P1 | NOT STARTED |
 | **Partial: WebUI Provider** | P2 | NOT STARTED |
@@ -28,6 +29,7 @@ This document tracks the phased implementation of missing MCP functionality in t
 ```
 PHASE 1: MCP Server Core          [COMPLETE]    ██████████ 100%
 PHASE 2: MCP Tools & Resources    [COMPLETE]    ██████████ 100%
+PHASE 2.5: History Manager        [DESIGNED]    ██░░░░░░░░ 20%
 PHASE 3: MCP Testing Framework    [NOT STARTED] ░░░░░░░░░░ 0%
 PHASE 4: Agentic Mode             [NOT STARTED] ░░░░░░░░░░ 0%
 PHASE 5: Partial Implementations  [NOT STARTED] ░░░░░░░░░░ 0%
@@ -169,6 +171,94 @@ src/mcp/
 │   ├── validate.py      ✅
 │   └── transpile.py     ✅
 └── server.py            ✅ (updated with tools + resources)
+```
+
+---
+
+## PHASE 2.5: History Manager
+
+**Goal**: Artifact persistence, session management, variation generation, and lineage tracking.
+
+**Duration**: Infrastructure sprint
+
+**Design Document**: `temp/history-manager-design.md`
+
+### Problem Statement
+
+The MCP server is currently **stateless**:
+- Generated layouts exist only as return values (not persisted)
+- No way to request "give me N variations"
+- No history of past generations
+- No linking between related layouts (original → refinements)
+- No cross-referencing MCP calls to artifacts or RAG sources
+
+### Tasks
+
+- [ ] **2.5.1** Create data models
+  - `GenerationArtifact` - persisted layout with full metadata
+  - `Session` - logical grouping of related operations
+  - `VariationSet` - grouped variations with comparison metrics
+  - File: `src/history/models.py`
+
+- [ ] **2.5.2** Implement storage backend
+  - `HistoryStorage` protocol
+  - `SQLiteStorage` implementation (recommended for local)
+  - `InMemoryStorage` for testing
+  - Files: `src/history/storage/`
+
+- [ ] **2.5.3** Implement HistoryManager
+  - Session management (create, get, list)
+  - Artifact CRUD (store, get, list, search)
+  - Preview caching
+  - File: `src/history/lib.py`
+
+- [ ] **2.5.4** Implement variation engine
+  - `generate_variations()` - N layouts with temperature spread
+  - Diversity metrics calculation
+  - Ranking by complexity, depth, component variety
+  - File: `src/history/variations.py`
+
+- [ ] **2.5.5** Implement lineage tracking
+  - Parent-child relationships
+  - RAG influence tracking (which examples → which outputs)
+  - File: `src/history/lineage.py`
+
+- [ ] **2.5.6** Integrate with `generate_layout`
+  - Add `session_id`, `parent_id`, `tags`, `persist` parameters
+  - Auto-store artifacts when `persist=True`
+  - Return `artifact_id` in response
+
+- [ ] **2.5.7** Add new MCP tools
+  - `generate_variations` - create N layout variations
+  - `get_history` - retrieve past generations
+  - `get_artifact` - retrieve specific artifact by ID
+  - `refine_layout` - modify existing layout
+  - `compare_layouts` - compare multiple artifacts
+
+### Acceptance Criteria
+
+- [ ] All generated layouts persisted with unique IDs
+- [ ] Can generate N variations with single request
+- [ ] Can retrieve any past generation by ID
+- [ ] Can trace lineage (parent → children)
+- [ ] Can search history semantically
+- [ ] Variations grouped and comparable
+
+### Files to Create
+
+```
+src/history/
+├── __init__.py
+├── lib.py              # HistoryManager implementation
+├── models.py           # Data models (Artifact, Session, etc.)
+├── variations.py       # Variation generation engine
+├── lineage.py          # Lineage tracking utilities
+├── storage/
+│   ├── __init__.py
+│   ├── protocol.py     # HistoryStorage protocol
+│   ├── sqlite.py       # SQLite implementation
+│   └── memory.py       # In-memory implementation
+└── test.py             # Unit tests
 ```
 
 ---
@@ -334,6 +424,22 @@ src/mcp/
 ---
 
 ## Progress Log
+
+### 2026-01-18 - Phase 2.5 Designed (History Manager)
+
+- **Audited current artifact tracking**
+  - Found: NO persistence of generated layouts (stateless)
+  - Found: NO session/history management
+  - Found: NO variation generation support
+  - Found: NO lineage tracking between related layouts
+  - Found: VectorStore only stores serialized text, not full layouts
+
+- **Designed History Manager API**
+  - Created `temp/history-manager-design.md` with full specification
+  - Core data models: `GenerationArtifact`, `Session`, `VariationSet`
+  - Storage backend: SQLite + FAISS (recommended for local)
+  - New MCP tools: `generate_variations`, `get_history`, `get_artifact`, `refine_layout`, `compare_layouts`
+  - Variation engine with diversity metrics and ranking
 
 ### 2026-01-18 - Phase 2 Refactored
 

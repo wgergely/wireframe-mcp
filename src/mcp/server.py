@@ -16,8 +16,10 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import sys
+from functools import lru_cache
 from typing import Any
 
 from fastmcp import FastMCP
@@ -167,6 +169,9 @@ def generate_layout(
         - draft: Human-readable text tree for quick review
         - stats: Generation statistics
     """
+    _validate_temperature(temperature)
+    _validate_provider(provider)
+
     from .tools.generate import generate_layout as _generate
 
     return _generate(
@@ -206,7 +211,7 @@ def validate_layout(
 def preview_layout(
     layout: dict[str, Any],
     style: str = "wireframe",
-    format: str = "png",
+    output_format: str = "png",
 ) -> dict[str, Any]:
     """Render a layout to a visual wireframe image.
 
@@ -219,7 +224,7 @@ def preview_layout(
             - "wireframe": Clean UI mockup (default)
             - "sketch": Hand-drawn appearance
             - "minimal": Simple boxes
-        format: Output format ("png", "svg"). Default: "png"
+        output_format: Output format ("png", "svg"). Default: "png"
 
     Returns:
         Dictionary with:
@@ -228,9 +233,11 @@ def preview_layout(
         - style: Visual style used
         - size_bytes: Image size
     """
+    _validate_format(output_format)
+
     from .tools.preview import preview_layout as _preview
 
-    return _preview(layout=layout, style=style, format=format)
+    return _preview(layout=layout, style=style, output_format=output_format)
 
 
 @mcp.tool
@@ -255,14 +262,55 @@ def search_layouts(
         - total_in_index: Total items in index
         - query: Original query
     """
+    _validate_k(k)
+
     from .tools.search import search_layouts as _search
 
     return _search(query=query, k=k, source_filter=source_filter)
 
 
 # =============================================================================
-# Resources
+# Resources (with caching for performance)
 # =============================================================================
+
+
+@lru_cache(maxsize=1)
+def _cached_component_schema() -> str:
+    """Cached component schema - rarely changes at runtime."""
+    from src.schema import export_llm_schema
+
+    return export_llm_schema()
+
+
+@lru_cache(maxsize=1)
+def _cached_layout_schema() -> str:
+    """Cached layout schema - rarely changes at runtime."""
+    from src.mid import LayoutNode
+
+    schema = LayoutNode.model_json_schema()
+    return json.dumps(schema, indent=2)
+
+
+@lru_cache(maxsize=1)
+def _cached_providers() -> str:
+    """Cached provider list - rarely changes at runtime."""
+    from src.providers import list_providers
+
+    dsl_providers = list_providers()
+
+    try:
+        from src.corpus.api import CorpusManager
+
+        corpus_providers = CorpusManager().list_providers()
+    except ImportError:
+        corpus_providers = []
+
+    return json.dumps(
+        {
+            "dsl_providers": dsl_providers,
+            "corpus_providers": corpus_providers,
+        }
+    )
 
 
 @mcp.resource("schema://components")
@@ -272,9 +320,7 @@ def get_component_schema() -> str:
     Returns JSON schema describing all 26 UI component types
     with their categories, constraints, and metadata.
     """
-    from src.schema import export_llm_schema
-
-    return export_llm_schema()
+    return _cached_component_schema()
 
 
 @mcp.resource("schema://layout")
@@ -284,12 +330,7 @@ def get_layout_schema() -> str:
     Returns the full JSON schema for LayoutNode structures,
     including all fields, types, and constraints.
     """
-    import json
-
-    from src.mid import LayoutNode
-
-    schema = LayoutNode.model_json_schema()
-    return json.dumps(schema, indent=2)
+    return _cached_layout_schema()
 
 
 @mcp.resource("config://models")
@@ -298,9 +339,9 @@ def get_available_models() -> str:
 
     Returns information about LLM models that can be used
     with generate_layout, including which are currently available.
-    """
-    import json
 
+    Note: Not cached as availability may change based on env vars.
+    """
     from src.config import get_available_llm_providers
 
     available_providers = get_available_llm_providers()
@@ -334,25 +375,7 @@ def get_available_providers() -> str:
     Returns information about transpilation providers (D2, PlantUML)
     and corpus providers (Rico, Enrico, etc.).
     """
-    import json
-
-    from src.providers import list_providers
-
-    dsl_providers = list_providers()
-
-    try:
-        from src.corpus.api import CorpusManager
-
-        corpus_providers = CorpusManager().list_providers()
-    except ImportError:
-        corpus_providers = []
-
-    return json.dumps(
-        {
-            "dsl_providers": dsl_providers,
-            "corpus_providers": corpus_providers,
-        }
-    )
+    return _cached_providers()
 
 
 # =============================================================================
