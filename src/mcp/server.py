@@ -120,9 +120,13 @@ def get_server_info() -> dict:
             "ping",
             "get_server_info",
             "generate_layout",
+            "generate_variations",
             "validate_layout",
             "preview_layout",
             "search_layouts",
+            "get_history",
+            "get_artifact",
+            "get_storage_stats",
         ],
         "resources": [
             "schema://components",
@@ -145,6 +149,10 @@ def generate_layout(
     temperature: float = 0.7,
     provider: str = "d2",
     include_rag: bool = True,
+    persist: bool = True,
+    session_id: str | None = None,
+    parent_id: str | None = None,
+    tags: list[str] | None = None,
 ) -> dict[str, Any]:
     """Generate a UI layout from natural language description.
 
@@ -162,9 +170,14 @@ def generate_layout(
         temperature: Generation temperature (0.0-2.0). Default: 0.7
         provider: Target DSL provider ("d2", "plantuml"). Default: "d2"
         include_rag: Include similar layouts as context. Default: True
+        persist: Save to history for later retrieval. Default: True
+        session_id: Attach to specific session (optional).
+        parent_id: Link to parent artifact for refinements (optional).
+        tags: User-defined tags for organization (optional).
 
     Returns:
         Dictionary with:
+        - artifact_id: UUID of stored artifact (if persist=True)
         - layout: Generated LayoutNode as JSON
         - draft: Human-readable text tree for quick review
         - stats: Generation statistics
@@ -180,6 +193,51 @@ def generate_layout(
         temperature=temperature,
         provider=provider,
         include_rag=include_rag,
+        persist=persist,
+        session_id=session_id,
+        parent_id=parent_id,
+        tags=tags,
+    )
+
+
+@mcp.tool
+def generate_variations(
+    query: str,
+    count: int = 3,
+    temperature_range: tuple[float, float] | None = None,
+    model: str | None = None,
+    include_rag: bool = True,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    """Generate multiple layout variations for comparison.
+
+    Creates N different layouts from the same query with varying
+    temperatures to produce diversity. Useful for exploring alternatives.
+
+    Args:
+        query: Natural language description of the desired layout.
+        count: Number of variations (1-10). Default: 3
+        temperature_range: Optional (min, max) temperature spread.
+        model: LLM model to use (optional).
+        include_rag: Include RAG context. Default: True
+        session_id: Attach to specific session (optional).
+
+    Returns:
+        Dictionary with:
+        - variation_set_id: UUID of the variation set
+        - artifacts: List of artifact summaries
+        - diversity_score: How different the variations are (0-1)
+        - rankings: Artifacts ranked by different criteria
+    """
+    from .tools.generate import generate_variations as _generate_variations
+
+    return _generate_variations(
+        query=query,
+        count=count,
+        temperature_range=temperature_range,
+        model=model,
+        include_rag=include_rag,
+        session_id=session_id,
     )
 
 
@@ -267,6 +325,79 @@ def search_layouts(
     from .tools.search import search_layouts as _search
 
     return _search(query=query, k=k, source_filter=source_filter)
+
+
+# =============================================================================
+# History Tools
+# =============================================================================
+
+
+@mcp.tool
+def get_history(
+    session_id: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+    query: str | None = None,
+) -> dict[str, Any]:
+    """Retrieve generation history.
+
+    Lists past generations with optional filtering.
+
+    Args:
+        session_id: Filter by session ID (optional).
+        limit: Maximum results (1-100). Default: 20
+        offset: Number of results to skip. Default: 0
+        query: Semantic search query (optional).
+
+    Returns:
+        Dictionary with:
+        - artifacts: List of artifact summaries
+        - total_count: Total matching artifacts
+        - has_more: Whether more results exist
+    """
+    from .tools.history import get_history as _get_history
+
+    return _get_history(
+        session_id=session_id,
+        limit=limit,
+        offset=offset,
+        query=query,
+    )
+
+
+@mcp.tool
+def get_artifact(
+    artifact_id: str,
+    include_lineage: bool = False,
+) -> dict[str, Any]:
+    """Retrieve a specific artifact by ID.
+
+    Args:
+        artifact_id: The artifact UUID.
+        include_lineage: Include parent/child relationships. Default: False
+
+    Returns:
+        Dictionary with full artifact data including layout and stats.
+    """
+    from .tools.history import get_artifact as _get_artifact
+
+    return _get_artifact(artifact_id=artifact_id, include_lineage=include_lineage)
+
+
+@mcp.tool
+def get_storage_stats() -> dict[str, Any]:
+    """Get history storage statistics.
+
+    Returns:
+        Dictionary with storage stats:
+        - total_size_mb: Total storage size
+        - artifact_count: Number of artifacts
+        - session_count: Number of sessions
+        - oldest_artifact_days: Age of oldest artifact
+    """
+    from .tools.history import get_storage_stats as _get_storage_stats
+
+    return _get_storage_stats()
 
 
 # =============================================================================
