@@ -16,11 +16,9 @@ Example:
     >>> from src.mcp.server import create_server
     >>> server = create_server()
 
-Available Tools (Phase 1):
+Available Tools:
     - ping: Health check
     - get_server_info: Server metadata
-
-Planned Tools (Phase 2):
     - generate_layout: Generate UI layouts from natural language
     - search_layouts: Search vector database for similar layouts
     - render_layout: Render layouts to PNG/SVG

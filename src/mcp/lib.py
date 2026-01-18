@@ -57,8 +57,13 @@ class ServerConfig:
 
 
 def get_server_version() -> str:
-    """Get server version string."""
-    return "0.1.0"
+    """Get server version string from package metadata."""
+    try:
+        from importlib.metadata import version
+
+        return version("wireframe-mcp")
+    except Exception:
+        return "0.1.0"  # Fallback for development
 
 
 def get_server_capabilities() -> dict:
