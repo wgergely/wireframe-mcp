@@ -72,6 +72,7 @@ class TestLayoutProviderContract:
     def test_transpile_with_context_default_implementation(self):
         """Default transpile_with_context delegates to transpile."""
         from src.ir import LayoutNode, TranspilationContext
+        from src.providers.lib import LayoutFeature
         from src.schema import ComponentType
 
         class TestProvider(LayoutProvider):
@@ -86,6 +87,10 @@ class TestLayoutProviderContract:
             @property
             def supported_formats(self) -> frozenset[str]:
                 return frozenset({"svg"})
+
+            @property
+            def supported_features(self) -> frozenset[LayoutFeature]:
+                return frozenset()
 
             def transpile(self, node: LayoutNode) -> str:
                 return f"transpiled:{node.id}"
@@ -248,7 +253,7 @@ class TestRegisterProviderDecorator:
     def test_register_provider_adds_to_registry(self):
         """register_provider adds provider to internal registry."""
         from src.ir import LayoutNode
-        from src.providers.lib import _registry, register_provider
+        from src.providers.lib import LayoutFeature, _registry, register_provider
 
         # Create a test provider
         @register_provider
@@ -264,6 +269,10 @@ class TestRegisterProviderDecorator:
             @property
             def supported_formats(self) -> frozenset[str]:
                 return frozenset({"svg", "png"})
+
+            @property
+            def supported_features(self) -> frozenset[LayoutFeature]:
+                return frozenset()
 
             def transpile(self, node: LayoutNode) -> str:
                 return "temp"
@@ -283,7 +292,7 @@ class TestRegisterProviderDecorator:
     def test_register_provider_returns_class(self):
         """register_provider returns the class for decorator chaining."""
         from src.ir import LayoutNode
-        from src.providers.lib import _registry, register_provider
+        from src.providers.lib import LayoutFeature, _registry, register_provider
 
         @register_provider
         class ChainTestProvider(LayoutProvider):
@@ -298,6 +307,10 @@ class TestRegisterProviderDecorator:
             @property
             def supported_formats(self) -> frozenset[str]:
                 return frozenset({"svg"})
+
+            @property
+            def supported_features(self) -> frozenset[LayoutFeature]:
+                return frozenset()
 
             def transpile(self, node: LayoutNode) -> str:
                 return "chain"

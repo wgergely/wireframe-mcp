@@ -25,6 +25,7 @@ from src.schema import (
     AlignSelf,
     ComponentCategory,
     ComponentType,
+    Display,
     Justify,
     Orientation,
     SemanticColor,
@@ -93,6 +94,18 @@ class LayoutNode(BaseModel):
     orientation: Orientation = Field(
         default=Orientation.VERTICAL,
         description="Layout flow direction for immediate children",
+    )
+    display: Display = Field(
+        default=Display.FLEX,
+        description="Layout mode: flex (default), grid, or block",
+    )
+    grid_columns: Annotated[int, Field(ge=1, le=12)] | None = Field(
+        default=None,
+        description="Number of grid columns (only when display=grid)",
+    )
+    grid_rows: Annotated[int, Field(ge=1)] | None = Field(
+        default=None,
+        description="Number of grid rows (only when display=grid)",
     )
 
     # Layout - new
@@ -339,6 +352,7 @@ def is_valid(node: LayoutNode) -> bool:
 __all__ = [
     # Re-exported from schema (for backward compatibility)
     "Orientation",
+    "Display",
     "Alignment",
     "AlignSelf",
     "AlignContent",

@@ -8,7 +8,7 @@ See: https://d2lang.com/
 """
 
 from src.mid import LayoutNode, Orientation
-from src.providers.lib import LayoutProvider, register_provider
+from src.providers.lib import LayoutFeature, LayoutProvider, register_provider
 
 
 @register_provider
@@ -53,6 +53,40 @@ class D2Provider(LayoutProvider):
     def supported_formats(self) -> frozenset[str]:
         """D2 via Kroki only supports SVG output."""
         return frozenset({"svg"})
+
+    @property
+    def supported_features(self) -> frozenset[LayoutFeature]:
+        """D2 supported layout features.
+
+        D2 supports:
+        - Flex and Grid display modes (via grid-rows/grid-columns)
+        - Horizontal/Vertical orientation (via direction)
+        - Grid columns/rows
+        - Gap (via grid-gap)
+        - Text styling (font-size, bold, color)
+
+        D2 does NOT support:
+        - Overlay orientation (z-stacking)
+        - flex_ratio (no proportional sizing without grid)
+        - Alignment properties (limited to 9 preset positions)
+        - Padding, wrap
+        - Scrollable containers
+        """
+        return frozenset(
+            {
+                LayoutFeature.DISPLAY_FLEX,
+                LayoutFeature.DISPLAY_GRID,
+                LayoutFeature.DISPLAY_BLOCK,
+                LayoutFeature.ORIENTATION_HORIZONTAL,
+                LayoutFeature.ORIENTATION_VERTICAL,
+                LayoutFeature.GRID_COLUMNS,
+                LayoutFeature.GRID_ROWS,
+                LayoutFeature.GAP,
+                LayoutFeature.TEXT_SIZE,
+                LayoutFeature.TEXT_WEIGHT,
+                LayoutFeature.SEMANTIC_COLOR,
+            }
+        )
 
     def transpile(self, node: LayoutNode) -> str:
         """Transpile a LayoutNode tree to D2 DSL.

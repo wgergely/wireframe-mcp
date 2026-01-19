@@ -15,7 +15,7 @@ from src.mid import (
     TextTransform,
     TextWeight,
 )
-from src.providers.lib import LayoutProvider, register_provider
+from src.providers.lib import LayoutFeature, LayoutProvider, register_provider
 
 
 @register_provider
@@ -34,6 +34,41 @@ class PlantUMLProvider(LayoutProvider):
     def supported_formats(self) -> frozenset[str]:
         """PlantUML via Kroki supports PNG, SVG, PDF, and JPEG."""
         return frozenset({"png", "svg", "pdf", "jpeg"})
+
+    @property
+    def supported_features(self) -> frozenset[LayoutFeature]:
+        """PlantUML Salt supported layout features.
+
+        PlantUML Salt supports:
+        - Flex display mode (via brace syntax)
+        - Horizontal/Vertical orientation (via {# and {)
+        - Gap (via spacer cells)
+        - Text styling (Creole markup for size, weight, color, transform)
+        - Scrollable containers ({S, {SI, {S-})
+
+        PlantUML Salt does NOT support:
+        - Grid display mode (no CSS Grid equivalent)
+        - Overlay orientation
+        - flex_ratio (no proportional column widths)
+        - Fixed width/height
+        - Alignment/justify properties
+        - Padding (only global skinparam)
+        - Wrap
+        """
+        return frozenset(
+            {
+                LayoutFeature.DISPLAY_FLEX,
+                LayoutFeature.DISPLAY_BLOCK,
+                LayoutFeature.ORIENTATION_HORIZONTAL,
+                LayoutFeature.ORIENTATION_VERTICAL,
+                LayoutFeature.GAP,
+                LayoutFeature.TEXT_SIZE,
+                LayoutFeature.TEXT_WEIGHT,
+                LayoutFeature.TEXT_TRANSFORM,
+                LayoutFeature.SEMANTIC_COLOR,
+                LayoutFeature.SCROLLABLE,
+            }
+        )
 
     def transpile(self, node: LayoutNode) -> str:
         body = self._transpile_node(node, indent=1)

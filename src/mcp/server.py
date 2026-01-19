@@ -223,21 +223,70 @@ def generate_variations(
 
 
 # =============================================================================
-# Discovery Tools
+# Status Tools
 # =============================================================================
 
 
 @mcp.tool
-def ping() -> dict:
-    """Check if the server is running.
+def status() -> dict[str, Any]:
+    """Check server health and dependency status.
+
+    Use this FIRST to verify the server is ready before generating layouts.
+    Reports availability of all required services.
 
     Returns:
-        Server status with version.
+        Dictionary with:
+        - status: "healthy", "degraded", or "unhealthy"
+        - version: Server version
+        - capabilities: Which tools will work
+            - generate_layout: True if LLM providers available
+            - preview_layout: True if Kroki service running
+            - rag_context: True if RAG index built
+        - services: Detailed status of each dependency
+        - action_required: What to fix if degraded/unhealthy
+
+    Example response when healthy:
+        {
+            "status": "healthy",
+            "capabilities": {
+                "generate_layout": true,
+                "preview_layout": true,
+                "rag_context": true
+            }
+        }
+
+    Example response when degraded:
+        {
+            "status": "degraded",
+            "capabilities": {
+                "generate_layout": true,
+                "preview_layout": false,  # Kroki not running
+                "rag_context": false      # Index not built
+            },
+            "action_required": [
+                "Start Kroki: python . docker up",
+                "Build RAG index: python . dev index build"
+            ]
+        }
     """
-    return {
-        "status": "ok",
-        "version": get_server_version(),
-    }
+    from .health import get_server_health
+
+    health = get_server_health()
+    result = health.to_dict()
+
+    # Add action_required for LLM consumption
+    actions = []
+    if not health.can_generate:
+        actions.append("Configure LLM: Set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env")
+    if not health.can_preview:
+        actions.append("Start Kroki: python . docker up")
+    if not health.can_use_rag:
+        actions.append("Build RAG index: python . dev index build")
+
+    if actions:
+        result["action_required"] = actions
+
+    return result
 
 
 # =============================================================================
@@ -307,8 +356,13 @@ def run_server(
         host: Bind address for HTTP/SSE.
         port: Port for HTTP/SSE.
     """
+    from .health import log_startup_status
+
     logger.info(f"Starting wireframe-mcp server v{get_server_version()}")
     logger.info(f"Transport: {transport.value}")
+
+    # Log health status on startup
+    log_startup_status()
 
     if transport == TransportType.STDIO:
         logger.info("Running in STDIO mode (for Claude Desktop)")

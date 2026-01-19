@@ -87,12 +87,15 @@ def generate_layout(
 
         # Load cached vector store if RAG enabled
         vector_store = None
+        rag_available = False
         if include_rag:
             from .cache import get_vector_store
 
             vector_store = get_vector_store()
             if vector_store is None:
                 logger.debug("No RAG index available, generating without context")
+            else:
+                rag_available = True
 
         # Configure generator
         config = GeneratorConfig(
@@ -122,6 +125,7 @@ def generate_layout(
                 "attempts": output.stats.attempts,
                 "tokens": output.stats.total_tokens,
                 "model": output.stats.final_model,
+                "rag_used": rag_available and len(output.prompt_context.examples) > 0,
                 "rag_examples": len(output.prompt_context.examples),
             },
         }

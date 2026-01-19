@@ -144,7 +144,7 @@ class TestToolRegistration:
         assert "generate_variations" in tool_names
 
         # Health check
-        assert "ping" in tool_names
+        assert "status" in tool_names
 
     @pytest.mark.unit
     def test_only_essential_tools_exposed(self):
@@ -169,28 +169,43 @@ class TestToolRegistration:
 # =============================================================================
 
 
-class TestPingTool:
-    """Tests for ping tool logic."""
+class TestStatusTool:
+    """Tests for status tool logic."""
 
     @pytest.mark.unit
-    def test_ping_returns_status(self):
-        """ping returns ok status."""
-        from .server import ping
+    def test_status_returns_health(self):
+        """status returns health status."""
+        from .server import status
 
-        result = ping.fn()
+        result = status.fn()
 
         assert isinstance(result, dict)
-        assert result["status"] == "ok"
+        assert "status" in result
+        assert result["status"] in ["healthy", "degraded", "unhealthy"]
         assert "version" in result
 
     @pytest.mark.unit
-    def test_ping_includes_version(self):
-        """ping includes server version."""
-        from .server import ping
+    def test_status_includes_capabilities(self):
+        """status includes capability information."""
+        from .server import status
 
-        result = ping.fn()
+        result = status.fn()
 
-        assert result["version"] == get_server_version()
+        assert "capabilities" in result
+        assert "generate_layout" in result["capabilities"]
+        assert "preview_layout" in result["capabilities"]
+
+    @pytest.mark.unit
+    def test_status_includes_services(self):
+        """status includes service status."""
+        from .server import status
+
+        result = status.fn()
+
+        assert "services" in result
+        assert "kroki" in result["services"]
+        assert "rag_index" in result["services"]
+        assert "llm_providers" in result["services"]
 
 
 # =============================================================================
@@ -273,7 +288,7 @@ class TestMCPProtocol:
                 tools = await client.list_tools()
 
                 tool_names = [t.name for t in tools]
-                assert "ping" in tool_names
+                assert "status" in tool_names
                 assert "generate_layout" in tool_names
                 assert "preview_layout" in tool_names
                 assert "generate_variations" in tool_names
@@ -281,13 +296,13 @@ class TestMCPProtocol:
             pytest.skip("fastmcp not installed")
 
     @pytest.mark.asyncio
-    async def test_client_can_call_ping(self):
-        """Client can call ping tool."""
+    async def test_client_can_call_status(self):
+        """Client can call status tool."""
         try:
             from fastmcp import Client
 
             async with Client(mcp) as client:
-                result = await client.call_tool("ping", {})
+                result = await client.call_tool("status", {})
 
                 assert result is not None
         except ImportError:
