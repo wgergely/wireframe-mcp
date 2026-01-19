@@ -114,13 +114,22 @@ def validate_layout(
     }
 
 
-def _collect_warnings(node: Any, warnings: list[dict]) -> None:
-    """Collect non-blocking warnings for a layout tree."""
-    # Check for buttons without labels
+def _collect_warnings(
+    node: Any, warnings: list[dict], depth: int = 0, max_depth: int = 10
+) -> None:
+    """Collect non-blocking warnings for a layout tree.
+
+    Args:
+        node: Layout node (dict or LayoutNode object).
+        warnings: List to append warnings to.
+        depth: Current nesting depth.
+        max_depth: Maximum recommended nesting depth.
+    """
     node_type = node.type if hasattr(node, "type") else node.get("type")
     node_id = node.id if hasattr(node, "id") else node.get("id")
     label = node.label if hasattr(node, "label") else node.get("label")
 
+    # Check for buttons/links without labels
     if node_type in ("button", "link") and not label:
         warnings.append(
             {
@@ -140,12 +149,20 @@ def _collect_warnings(node: Any, warnings: list[dict]) -> None:
             }
         )
 
-    # Check for very deep nesting
-    children = node.children if hasattr(node, "children") else node.get("children", [])
+    # Check for deep nesting
+    if depth > max_depth:
+        warnings.append(
+            {
+                "node_id": node_id,
+                "message": f"Deeply nested ({depth} levels) - consider flattening",
+                "warning_type": "deep_nesting",
+            }
+        )
 
-    # Recurse
+    # Recurse into children
+    children = node.children if hasattr(node, "children") else node.get("children", [])
     for child in children:
-        _collect_warnings(child, warnings)
+        _collect_warnings(child, warnings, depth + 1, max_depth)
 
 
 __all__ = ["validate_layout"]

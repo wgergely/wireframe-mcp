@@ -71,7 +71,6 @@ def generate_layout(
             └── Submit [button]
         >>> print(f"Artifact ID: {result['artifact_id']}")
     """
-    from src.config import get_index_dir
     from src.llm import GeneratorConfig, LayoutGenerator, LLMModel, create_llm_backend
 
     try:
@@ -86,21 +85,14 @@ def generate_layout(
                 )
             backend = create_llm_backend(llm_model)
 
-        # Load vector store if RAG enabled
+        # Load cached vector store if RAG enabled
         vector_store = None
         if include_rag:
-            try:
-                from src.vector import VectorStore
+            from .cache import get_vector_store
 
-                index_dir = get_index_dir()
-                if (index_dir / "index.faiss").exists():
-                    vector_store = VectorStore()
-                    vector_store.load(index_dir)
-                    logger.info(f"Loaded RAG index with {len(vector_store)} items")
-                else:
-                    logger.debug("No RAG index found, generating without context")
-            except Exception as e:
-                logger.warning(f"Could not load RAG index: {e}")
+            vector_store = get_vector_store()
+            if vector_store is None:
+                logger.debug("No RAG index available, generating without context")
 
         # Configure generator
         config = GeneratorConfig(

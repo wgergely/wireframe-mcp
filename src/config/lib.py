@@ -150,6 +150,20 @@ class EnvVar(Enum):
         description="MCP server bind address",
         category="service",
     )
+    MCP_PREVIEW_PROVIDER = EnvConfig(
+        name="MCP_PREVIEW_PROVIDER",
+        default="plantuml",
+        var_type=str,
+        description="Default provider for preview rendering (plantuml, d2)",
+        category="service",
+    )
+    MCP_PREVIEW_SKETCH = EnvConfig(
+        name="MCP_PREVIEW_SKETCH",
+        default=False,
+        var_type=bool,
+        description="Enable D2 sketch/hand-drawn mode (only when provider=d2)",
+        category="service",
+    )
 
     # -------------------------------------------------------------------------
     # Service Ports (chosen to avoid common ports like 8000, 8080)

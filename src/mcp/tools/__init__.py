@@ -5,19 +5,26 @@ validation, preview, and search capabilities.
 
 Tools:
     - generate_layout: Generate UI layouts from natural language (returns draft + JSON)
+    - generate_variations: Generate multiple layout variations for comparison
     - validate_layout: Validate layout structure
     - preview_layout: Render layouts to PNG/SVG wireframe images
     - search_layouts: Search vector database for similar layouts
+
+Cache utilities:
+    - clear_vector_store_cache: Clear cached VectorStore (if index rebuilt)
 """
 
-from .generate import generate_layout
+from .cache import clear_vector_store_cache
+from .generate import generate_layout, generate_variations
 from .preview import preview_layout
 from .search import search_layouts
 from .validate import validate_layout
 
 __all__ = [
     "generate_layout",
+    "generate_variations",
     "validate_layout",
     "preview_layout",
     "search_layouts",
+    "clear_vector_store_cache",
 ]

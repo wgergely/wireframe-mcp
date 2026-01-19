@@ -1,0 +1,72 @@
+======================================================================
+NATURAL LANGUAGE PROMPT:
+======================================================================
+
+  "login page with email and password fields, sign in button,
+   forgot password link, and create account link"
+
+======================================================================
+1. DRAFT (Text Tree) - Quick structure review
+======================================================================
+
+Login Page [container]
+├── Welcome Back [text]
+├── Login Form [card]
+│   ├── Email [input]
+│   ├── Password [input]
+│   └── actions [container, horizontal]
+│       ├── Forgot Password? [text_button]
+│       └── Sign In [button]
+└── Create Account [text_button]
+
+======================================================================
+2. PLANTUML SALT DSL - Wireframe aesthetic
+======================================================================
+
+@startsalt
+  {^
+    "Login Page"
+    "Welcome Back"
+    {
+      "Login Form"
+      "Email    "
+      "Password    "
+      {#
+        [Forgot Password?] | [Sign In]
+      }
+    }
+    [Create Account]
+  }
+@endsalt
+
+======================================================================
+3. D2 DSL - Architectural diagram
+======================================================================
+
+login-page: Login Page {
+
+  header: Welcome Back {
+  }
+
+  form: Login Form {
+
+    email: Email {
+    }
+
+    password: Password {
+    }
+
+    actions: container {
+      direction: right
+
+      forgot: Forgot Password? {
+      }
+
+      submit: Sign In {
+      }
+    }
+  }
+
+  signup: Create Account {
+  }
+}

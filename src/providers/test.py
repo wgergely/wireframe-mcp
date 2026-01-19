@@ -83,6 +83,10 @@ class TestLayoutProviderContract:
             def file_extension(self) -> str:
                 return ".test"
 
+            @property
+            def supported_formats(self) -> frozenset[str]:
+                return frozenset({"svg"})
+
             def transpile(self, node: LayoutNode) -> str:
                 return f"transpiled:{node.id}"
 
@@ -257,6 +261,10 @@ class TestRegisterProviderDecorator:
             def file_extension(self) -> str:
                 return ".tmp"
 
+            @property
+            def supported_formats(self) -> frozenset[str]:
+                return frozenset({"svg", "png"})
+
             def transpile(self, node: LayoutNode) -> str:
                 return "temp"
 
@@ -286,6 +294,10 @@ class TestRegisterProviderDecorator:
             @property
             def file_extension(self) -> str:
                 return ".chain"
+
+            @property
+            def supported_formats(self) -> frozenset[str]:
+                return frozenset({"svg"})
 
             def transpile(self, node: LayoutNode) -> str:
                 return "chain"

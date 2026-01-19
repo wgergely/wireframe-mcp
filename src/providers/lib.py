@@ -18,6 +18,7 @@ class LayoutProvider(ABC):
     Subclasses must implement:
         - name: Provider identifier string
         - file_extension: Output file extension
+        - supported_formats: Set of output formats (png, svg, pdf, jpeg)
         - transpile: IR to DSL conversion
 
     Optionally implement transpile_with_context for RAG-aware transpilation.
@@ -26,6 +27,7 @@ class LayoutProvider(ABC):
         >>> class MyProvider(LayoutProvider):
         ...     name = "my_dsl"
         ...     file_extension = ".dsl"
+        ...     supported_formats = frozenset({"svg", "png"})
         ...     def transpile(self, node: LayoutNode) -> str:
         ...         return f"node: {node.id}"
     """
@@ -40,6 +42,16 @@ class LayoutProvider(ABC):
     @abstractmethod
     def file_extension(self) -> str:
         """Output file extension (e.g., '.d2', '.puml')."""
+        ...
+
+    @property
+    @abstractmethod
+    def supported_formats(self) -> frozenset[str]:
+        """Supported output formats for rendering via Kroki.
+
+        Returns:
+            frozenset of format strings (e.g., {"svg", "png", "pdf"}).
+        """
         ...
 
     @abstractmethod
@@ -133,6 +145,28 @@ def list_providers() -> list[str]:
     """
     _import_providers()
     return list(_registry.keys())
+
+
+def get_provider_formats(name: str) -> frozenset[str]:
+    """Get supported output formats for a provider.
+
+    Args:
+        name: The provider identifier (e.g., "d2", "plantuml").
+
+    Returns:
+        frozenset[str]: Set of supported format strings.
+
+    Raises:
+        KeyError: If no provider with the given name is registered.
+
+    Example:
+        >>> get_provider_formats("plantuml")
+        frozenset({'png', 'svg', 'pdf', 'jpeg'})
+        >>> get_provider_formats("d2")
+        frozenset({'svg'})
+    """
+    provider = get_provider(name)
+    return provider.supported_formats
 
 
 def _import_providers() -> None:

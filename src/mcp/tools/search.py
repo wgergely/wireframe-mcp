@@ -44,22 +44,17 @@ def search_layouts(
         >>> for item in result["results"]:
         ...     print(f"Score: {item['score']:.2f} - {item['text'][:50]}...")
     """
-    from src.config import get_index_dir
-    from src.vector import VectorStore
+    from .cache import get_vector_store
 
-    # Clamp k to reasonable range
+    # Clamp k to reasonable range (validation done at server level)
     k = max(1, min(20, k))
 
-    # Load vector store
-    index_dir = get_index_dir()
-    if not (index_dir / "index.faiss").exists():
+    # Get cached vector store
+    store = get_vector_store()
+    if store is None:
         raise RuntimeError(
-            f"Vector index not found at {index_dir}. "
-            "Build it with: python . dev index build"
+            "Vector index not available. Build it with: python . corpus index"
         )
-
-    store = VectorStore()
-    store.load(index_dir)
 
     logger.info(f"Searching for: {query} (k={k})")
 

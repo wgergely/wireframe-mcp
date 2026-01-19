@@ -30,6 +30,11 @@ class PlantUMLProvider(LayoutProvider):
     def file_extension(self) -> str:
         return ".puml"
 
+    @property
+    def supported_formats(self) -> frozenset[str]:
+        """PlantUML via Kroki supports PNG, SVG, PDF, and JPEG."""
+        return frozenset({"png", "svg", "pdf", "jpeg"})
+
     def transpile(self, node: LayoutNode) -> str:
         body = self._transpile_node(node, indent=1)
         return f"@startsalt\n{body}\n@endsalt"

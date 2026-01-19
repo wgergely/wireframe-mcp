@@ -49,6 +49,11 @@ class D2Provider(LayoutProvider):
         """D2 file extension."""
         return ".d2"
 
+    @property
+    def supported_formats(self) -> frozenset[str]:
+        """D2 via Kroki only supports SVG output."""
+        return frozenset({"svg"})
+
     def transpile(self, node: LayoutNode) -> str:
         """Transpile a LayoutNode tree to D2 DSL.
 

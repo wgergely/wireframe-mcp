@@ -120,6 +120,20 @@ class Wrap(str, Enum):
     WRAP = "wrap"
 
 
+class Display(str, Enum):
+    """Display/layout mode for containers.
+
+    Determines how children are laid out:
+    - FLEX: Flexbox layout (default) - single-axis distribution
+    - GRID: CSS Grid layout - explicit rows/columns with cell placement
+    - BLOCK: Block layout - simple vertical stacking without flex features
+    """
+
+    FLEX = "flex"
+    GRID = "grid"
+    BLOCK = "block"
+
+
 class TextSize(str, Enum):
     """Text size hierarchy for visual importance.
 
@@ -741,6 +755,21 @@ class LayoutNodeSchema(BaseModel):
         default=Orientation.VERTICAL,
         description="Flow direction: horizontal, vertical, or overlay",
     )
+    display: Display = Field(
+        default=Display.FLEX,
+        description="Layout mode: flex (default), grid, or block",
+    )
+    grid_columns: int | None = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description="Number of grid columns (only when display=grid)",
+    )
+    grid_rows: int | None = Field(
+        default=None,
+        ge=1,
+        description="Number of grid rows (only when display=grid)",
+    )
 
     # Layout - Flex Container behavior
     align: Alignment | None = Field(
@@ -1026,6 +1055,7 @@ __all__ = [
     "Alignment",
     "Justify",
     "Wrap",
+    "Display",
     "AlignContent",
     "AlignSelf",
     "TextSize",

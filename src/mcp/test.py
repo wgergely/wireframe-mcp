@@ -17,6 +17,7 @@ from .lib import (
 )
 from .server import create_server, mcp
 
+
 # =============================================================================
 # Configuration Tests
 # =============================================================================
@@ -133,21 +134,34 @@ class TestToolRegistration:
     """Tests for MCP tool registration."""
 
     @pytest.mark.unit
-    def test_ping_tool_registered(self):
-        """ping tool is registered on server."""
-        # Verify server instance exists and has tools capability
-        # Note: Actual tool registration is verified in integration tests
-        assert mcp is not None
-        assert get_server_capabilities()["tools"] is True
+    def test_core_tools_registered(self):
+        """Core LLM tools are registered on server."""
+        tool_names = set(mcp._tool_manager._tools.keys())
+
+        # Core user workflow tools
+        assert "generate_layout" in tool_names
+        assert "preview_layout" in tool_names
+        assert "generate_variations" in tool_names
+
+        # Health check
+        assert "ping" in tool_names
 
     @pytest.mark.unit
-    def test_get_server_info_tool_registered(self):
-        """get_server_info tool is registered on server."""
-        from .server import get_server_info
+    def test_only_essential_tools_exposed(self):
+        """Only essential tools are exposed (no dev/admin tools)."""
+        tool_names = set(mcp._tool_manager._tools.keys())
 
-        # FastMCP wraps tools in FunctionTool, access underlying fn
-        result = get_server_info.fn()
-        assert "get_server_info" in result["tools"]
+        # Should have exactly 4 tools
+        assert len(tool_names) == 4
+
+        # These should NOT be exposed (dev/admin concerns)
+        assert "get_server_info" not in tool_names
+        assert "validate_layout" not in tool_names
+        assert "search_layouts" not in tool_names
+        assert "get_history" not in tool_names
+        assert "get_artifact" not in tool_names
+        assert "get_sessions" not in tool_names
+        assert "get_storage_stats" not in tool_names
 
 
 # =============================================================================
@@ -163,55 +177,20 @@ class TestPingTool:
         """ping returns ok status."""
         from .server import ping
 
-        # FastMCP wraps tools in FunctionTool, access underlying fn
         result = ping.fn()
 
         assert isinstance(result, dict)
         assert result["status"] == "ok"
         assert "version" in result
-        assert "capabilities" in result
 
     @pytest.mark.unit
     def test_ping_includes_version(self):
         """ping includes server version."""
         from .server import ping
 
-        # FastMCP wraps tools in FunctionTool, access underlying fn
         result = ping.fn()
 
         assert result["version"] == get_server_version()
-
-
-class TestGetServerInfoTool:
-    """Tests for get_server_info tool logic."""
-
-    @pytest.mark.unit
-    def test_get_server_info_returns_dict(self):
-        """get_server_info returns proper structure."""
-        from .server import get_server_info
-
-        # FastMCP wraps tools in FunctionTool, access underlying fn
-        result = get_server_info.fn()
-
-        assert isinstance(result, dict)
-        assert result["name"] == "wireframe-mcp"
-        assert "version" in result
-        assert "description" in result
-        assert "capabilities" in result
-        assert "tools" in result
-
-    @pytest.mark.unit
-    def test_get_server_info_lists_tools(self):
-        """get_server_info includes tool list."""
-        from .server import get_server_info
-
-        # FastMCP wraps tools in FunctionTool, access underlying fn
-        result = get_server_info.fn()
-
-        assert isinstance(result["tools"], list)
-        assert "ping" in result["tools"]
-        assert "get_server_info" in result["tools"]
-        assert "preview_layout" in result["tools"]  # Renamed from render_layout
 
 
 # =============================================================================
@@ -241,43 +220,6 @@ class TestValidationHelpers:
             _validate_temperature(-0.1)
         with pytest.raises(ValueError, match="Temperature must be"):
             _validate_temperature(2.1)
-
-    @pytest.mark.unit
-    def test_validate_k_valid(self):
-        """Valid k values don't raise."""
-        from .server import _validate_k
-
-        _validate_k(1)
-        _validate_k(5)
-        _validate_k(20)
-
-    @pytest.mark.unit
-    def test_validate_k_invalid(self):
-        """Invalid k values raise ValueError."""
-        from .server import _validate_k
-
-        with pytest.raises(ValueError, match="k must be"):
-            _validate_k(0)
-        with pytest.raises(ValueError, match="k must be"):
-            _validate_k(21)
-
-    @pytest.mark.unit
-    def test_validate_format_valid(self):
-        """Valid formats don't raise."""
-        from .server import _validate_format
-
-        _validate_format("png")
-        _validate_format("svg")
-
-    @pytest.mark.unit
-    def test_validate_format_invalid(self):
-        """Invalid formats raise ValueError."""
-        from .server import _validate_format
-
-        with pytest.raises(ValueError, match="Invalid format"):
-            _validate_format("gif")
-        with pytest.raises(ValueError, match="Invalid format"):
-            _validate_format("jpg")
 
     @pytest.mark.unit
     def test_validate_provider_valid(self):
@@ -317,7 +259,6 @@ class TestMCPProtocol:
             from fastmcp import Client
 
             async with Client(mcp) as client:
-                # Connection successful if we get here
                 assert client is not None
         except ImportError:
             pytest.skip("fastmcp not installed")
@@ -333,7 +274,9 @@ class TestMCPProtocol:
 
                 tool_names = [t.name for t in tools]
                 assert "ping" in tool_names
-                assert "get_server_info" in tool_names
+                assert "generate_layout" in tool_names
+                assert "preview_layout" in tool_names
+                assert "generate_variations" in tool_names
         except ImportError:
             pytest.skip("fastmcp not installed")
 
@@ -345,20 +288,6 @@ class TestMCPProtocol:
 
             async with Client(mcp) as client:
                 result = await client.call_tool("ping", {})
-
-                # Result structure depends on FastMCP version
-                assert result is not None
-        except ImportError:
-            pytest.skip("fastmcp not installed")
-
-    @pytest.mark.asyncio
-    async def test_client_can_call_get_server_info(self):
-        """Client can call get_server_info tool."""
-        try:
-            from fastmcp import Client
-
-            async with Client(mcp) as client:
-                result = await client.call_tool("get_server_info", {})
 
                 assert result is not None
         except ImportError:
