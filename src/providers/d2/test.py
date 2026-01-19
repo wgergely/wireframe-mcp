@@ -38,26 +38,36 @@ class TestD2Provider:
         assert result.strip().endswith("}")
 
     @pytest.mark.unit
-    def test_horizontal_direction(self, provider):
-        """Horizontal orientation adds direction: right."""
+    def test_horizontal_uses_grid_columns(self, provider):
+        """Horizontal orientation with children uses grid-columns."""
         node = LayoutNode(
             id="row",
             type=ComponentType.CONTAINER,
             orientation=Orientation.HORIZONTAL,
+            children=[
+                LayoutNode(id="a", type=ComponentType.BUTTON),
+                LayoutNode(id="b", type=ComponentType.BUTTON),
+            ],
         )
         result = provider.transpile(node)
-        assert "direction: right" in result
+        assert "grid-columns: 2" in result
 
     @pytest.mark.unit
-    def test_vertical_no_direction(self, provider):
-        """Vertical orientation does not add direction."""
+    def test_vertical_uses_grid_rows(self, provider):
+        """Vertical orientation with multiple children uses grid-rows."""
         node = LayoutNode(
             id="col",
             type=ComponentType.CONTAINER,
             orientation=Orientation.VERTICAL,
+            children=[
+                LayoutNode(id="a", type=ComponentType.BUTTON),
+                LayoutNode(id="b", type=ComponentType.BUTTON),
+                LayoutNode(id="c", type=ComponentType.BUTTON),
+            ],
         )
         result = provider.transpile(node)
-        assert "direction:" not in result
+        assert "grid-rows: 3" in result
+        assert "grid-columns" not in result
 
     @pytest.mark.unit
     def test_nested_containers(self, provider):
@@ -86,15 +96,16 @@ class TestD2Provider:
         assert child_indent > parent_indent
 
     @pytest.mark.unit
-    def test_flex_ratio_width(self, provider):
-        """Flex ratio converts to width percentage."""
+    def test_flex_ratio_in_unsupported_hints(self, provider):
+        """Flex ratio is preserved in unsupported hints comment."""
         node = LayoutNode(
             id="sidebar",
             type=ComponentType.DRAWER,
             flex_ratio=3,
         )
         result = provider.transpile(node)
-        assert "width: 25%" in result  # 3/12 = 25%
+        assert "# unsupported:" in result
+        assert "flex=3" in result
 
     @pytest.mark.unit
     def test_flex_ratio_default_no_width(self, provider):
@@ -153,8 +164,8 @@ class TestD2Provider:
         )
         result = provider.transpile(layout)
         assert "dashboard: container {" in result
-        assert "direction: right" in result
+        assert "grid-columns: 2" in result  # 2 children in horizontal layout
         assert "sidebar: Navigation {" in result
-        assert "width: 25%" in result  # 3/12
+        assert "flex=3" in result  # flex_ratio preserved in hints
         assert "main: Content {" in result
-        assert "width: 75%" in result  # 9/12
+        assert "flex=9" in result  # flex_ratio preserved in hints

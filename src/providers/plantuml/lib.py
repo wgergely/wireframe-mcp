@@ -93,6 +93,12 @@ class PlantUMLProvider(LayoutProvider):
         return "\n".join(lines)
 
     def _transpile_node(self, node: LayoutNode, indent: int) -> str:
+        """Transpile a node and its children to Salt syntax.
+
+        Salt layout rules:
+        - Horizontal: children on same line with | separators: {# a | b | c }
+        - Vertical: children on separate lines, indented: { a \\n b \\n c }
+        """
         prefix = "  " * indent
         brace = self._get_brace_style(node)
 
@@ -102,87 +108,108 @@ class PlantUMLProvider(LayoutProvider):
 
         content = self._render_component(node)
 
+        # Leaf node - no children, just render the component
         if not node.children:
             return f"{prefix}{content}"
 
-        lines: list[str] = []
-        lines.append(f"{prefix}{brace}")
+        lines: list[str] = [f"{prefix}{brace}"]
 
+        # Add label if present
         if node.label:
-            cleaned_label = self._apply_styling(node.label, node)
-            lines.append(f'{prefix}  "{cleaned_label}"')
+            styled_label = self._apply_styling(node.label, node)
+            lines.append(f'{prefix}  "{styled_label}"')
 
-        # Transpile children
-        child_nodes = [
-            self._transpile_node(
-                child, indent + (0 if node.orientation == Orientation.HORIZONTAL else 1)
-            )
-            for child in node.children
-        ]
-
-        # Handle GAP by inserting spacers
-        if node.gap and node.gap > 0 and len(child_nodes) > 1:
-            # For horizontal table {# a | b }, if we want gap we need
-            # {# a | . | b }
-
-            if node.orientation == Orientation.HORIZONTAL:
-                # Interleave spacer
-                new_children = []
-                for i, c in enumerate(child_nodes):
-                    new_children.append(c.strip())
-                    if i < len(child_nodes) - 1:
-                        new_children.append(".")
-
-                lines.append(f"{prefix}  {' | '.join(new_children)}")
-            else:
-                # Vertical
-                for i, c in enumerate(child_nodes):
-                    lines.append(c)
-                    if i < len(child_nodes) - 1:
-                        lines.append(f'{prefix}  "."')  # Vertical spacer text
+        # Render children based on orientation
+        if node.orientation == Orientation.HORIZONTAL:
+            self._render_horizontal_children(node, lines, prefix)
         else:
-            # Standard rendering without explicit gap insertion
-            if node.orientation == Orientation.HORIZONTAL:
-                child_contents = [c.strip() for c in child_nodes]
-                lines.append(f"{prefix}  {' | '.join(child_contents)}")
-            else:
-                lines += child_nodes
+            self._render_vertical_children(node, lines, indent + 1)
 
         lines.append(f"{prefix}}}")
         return "\n".join(lines)
 
+    def _render_horizontal_children(
+        self, node: LayoutNode, lines: list[str], prefix: str
+    ) -> None:
+        """Render children horizontally with | separators.
+
+        Salt horizontal syntax: {# item1 | item2 | item3 }
+        For gap, insert spacer dots: {# item1 | . | item2 }
+        """
+        # Horizontal children are rendered inline, indent doesn't matter
+        child_contents = [
+            self._transpile_node(child, indent=0).strip() for child in node.children
+        ]
+
+        # Insert spacers for gap
+        if node.gap and node.gap > 0 and len(child_contents) > 1:
+            spaced = []
+            for i, content in enumerate(child_contents):
+                spaced.append(content)
+                if i < len(child_contents) - 1:
+                    spaced.append(".")
+            child_contents = spaced
+
+        lines.append(f"{prefix}  {' | '.join(child_contents)}")
+
+    def _render_vertical_children(
+        self, node: LayoutNode, lines: list[str], child_indent: int
+    ) -> None:
+        """Render children vertically, each on its own line.
+
+        Salt vertical syntax: { item1 \\n item2 \\n item3 }
+        For gap, insert spacer rows: { item1 \\n "." \\n item2 }
+        """
+        child_prefix = "  " * child_indent
+        has_gap = node.gap and node.gap > 0 and len(node.children) > 1
+
+        for i, child in enumerate(node.children):
+            lines.append(self._transpile_node(child, child_indent))
+            # Insert spacer between children (not after last)
+            if has_gap and i < len(node.children) - 1:
+                lines.append(f'{child_prefix}"."')
+
     def _get_brace_style(self, node: LayoutNode) -> str:
-        # 1. Properties overriding structure
+        """Determine Salt brace style based on node properties.
+
+        Salt brace modifiers:
+        - {   : Basic vertical layout (default)
+        - {#  : Table/grid layout (horizontal children with | separators)
+        - {+  : Tree/list layout (items prefixed with +)
+        - {*  : Menu/window frame
+        - {^  : Titled group box (label becomes header)
+        - {S  : Scrollable pane
+        - {SI : Scrollable with indicators
+        - {S- : Scrollable horizontal only
+
+        Priority: scrollable > type-specific > labeled container > orientation
+        """
+        # 1. Scrollable takes highest priority
         if node.scrollable:
             return "{S"
 
-        # 2. Specific Component Types
-        if node.type == ComponentType.TREE:
-            return "{+"
-        if node.type == ComponentType.MENU_BAR:
-            return "{*"
-        if node.type in (ComponentType.MODAL, ComponentType.WEB_VIEW):
-            return "{*"  # Window frame
+        # 2. Type-specific braces
+        match node.type:
+            case ComponentType.TREE:
+                return "{+"
+            case ComponentType.MENU_BAR:
+                return "{*"
+            case ComponentType.MODAL | ComponentType.WEB_VIEW:
+                return "{*"  # Window frame
+            case ComponentType.DATA_GRID:
+                return "{#"
+            case ComponentType.NAVBAR | ComponentType.DRAWER | ComponentType.TAB_BAR:
+                return "{+"
 
-        # 3. Enhanced Containers
+        # 3. Labeled containers get group box style
         if node.type == ComponentType.CONTAINER and node.label:
-            return "{^"  # Titled Group Box
+            return "{^"
 
-        # 4. Data Grid
-        if node.type == ComponentType.DATA_GRID:
-            return "{#"
-
-        # 5. Orientation Defaults
+        # 4. Horizontal orientation uses table layout
         if node.orientation == Orientation.HORIZONTAL:
             return "{#"
 
-        if node.type in (
-            ComponentType.NAVBAR,
-            ComponentType.DRAWER,
-            ComponentType.TAB_BAR,
-        ):
-            return "{+"
-
+        # 5. Default vertical layout
         return "{"
 
     def _apply_styling(self, text: str, node: LayoutNode) -> str:

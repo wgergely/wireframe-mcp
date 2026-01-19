@@ -1,14 +1,15 @@
 """D2 DSL provider for layout transpilation.
 
 D2 is a declarative diagramming language with first-class support for
-nested containers and constraint-based layout. It's ideal for representing
-hierarchical UI structures.
+nested containers and grid-based layout. It's ideal for representing
+hierarchical UI structures with proper spatial arrangement.
 
 See: https://d2lang.com/
 """
 
-from src.mid import LayoutNode, Orientation
+from src.mid import LayoutNode, Orientation, SemanticColor, TextWeight
 from src.providers.lib import LayoutFeature, LayoutProvider, register_provider
+from src.schema import Display
 
 
 @register_provider
@@ -17,23 +18,22 @@ class D2Provider(LayoutProvider):
 
     D2 features used:
         - Nested containers with `{ }` blocks
-        - Direction control via `direction: right/down`
-        - Width hints via comments (D2 doesn't support % widths natively)
-        - Style hints via comments for align, justify, gap, padding
-        - Text styling hints via comments
+        - Grid layout via `grid-columns` and `grid-rows`
+        - Grid spacing via `grid-gap`
+        - Text styling via `style` block (font-size, bold, font-color)
 
     Example output:
         ```d2
         root: Dashboard {
-          direction: right
-          # layout: align=center, justify=between, gap=16
+          grid-columns: 2
+          grid-gap: 16
 
           sidebar: Navigation {
-            # width: 25%
+            style.font-size: 14
           }
 
           main: Content {
-            # width: 75%
+            grid-rows: 3
           }
         }
         ```
@@ -60,17 +60,18 @@ class D2Provider(LayoutProvider):
 
         D2 supports:
         - Flex and Grid display modes (via grid-rows/grid-columns)
-        - Horizontal/Vertical orientation (via direction)
+        - Horizontal/Vertical orientation (via grid-columns/grid-rows)
         - Grid columns/rows
         - Gap (via grid-gap)
-        - Text styling (font-size, bold, color)
+        - Text styling (font-size, bold, font-color)
 
         D2 does NOT support:
         - Overlay orientation (z-stacking)
-        - flex_ratio (no proportional sizing without grid)
+        - flex_ratio (no proportional sizing)
         - Alignment properties (limited to 9 preset positions)
         - Padding, wrap
         - Scrollable containers
+        - Text transform (uppercase/lowercase)
         """
         return frozenset(
             {
@@ -116,24 +117,20 @@ class D2Provider(LayoutProvider):
         # Node declaration with label
         lines.append(f"{prefix}{node.id}: {label} {{")
 
-        # Direction attribute for horizontal layouts
-        if node.orientation == Orientation.HORIZONTAL:
-            lines.append(f"{prefix}  direction: right")
+        # Grid layout configuration
+        grid_config = self._build_grid_config(node)
+        for config_line in grid_config:
+            lines.append(f"{prefix}  {config_line}")
 
-        # Width hint based on flex ratio (as comment - D2 doesn't support % widths)
-        if node.flex_ratio != 1:
-            width_pct = self._flex_to_percentage(node.flex_ratio)
-            lines.append(f"{prefix}  # width: {width_pct}%")
+        # Text styling via style block
+        style_lines = self._build_style_block(node)
+        for style_line in style_lines:
+            lines.append(f"{prefix}  {style_line}")
 
-        # Layout properties as D2 style hints
-        layout_hints = self._build_layout_hints(node)
-        if layout_hints:
-            lines.append(f"{prefix}  # layout: {layout_hints}")
-
-        # Text styling as D2 style hints
-        text_hints = self._build_text_hints(node)
-        if text_hints:
-            lines.append(f"{prefix}  # text: {text_hints}")
+        # Unsupported properties as comments (for LLM context preservation)
+        hints = self._build_unsupported_hints(node)
+        if hints:
+            lines.append(f"{prefix}  # unsupported: {hints}")
 
         # Recurse into children
         for child in node.children:
@@ -143,32 +140,97 @@ class D2Provider(LayoutProvider):
         lines.append(f"{prefix}}}")
         return "\n".join(lines)
 
-    def _build_layout_hints(self, node: LayoutNode) -> str:
-        """Build layout hints string from node properties."""
+    def _build_grid_config(self, node: LayoutNode) -> list[str]:
+        """Build D2 grid layout configuration.
+
+        Uses grid-columns for horizontal layouts, grid-rows for explicit grids.
+        """
+        config: list[str] = []
+
+        # Explicit grid mode
+        if node.display == Display.GRID:
+            if node.grid_columns:
+                config.append(f"grid-columns: {node.grid_columns}")
+            if node.grid_rows:
+                config.append(f"grid-rows: {node.grid_rows}")
+        # Horizontal orientation → use grid-columns
+        elif node.orientation == Orientation.HORIZONTAL and node.children:
+            config.append(f"grid-columns: {len(node.children)}")
+        # Vertical with multiple children → use grid-rows for clarity
+        elif node.orientation == Orientation.VERTICAL and len(node.children) > 1:
+            config.append(f"grid-rows: {len(node.children)}")
+
+        # Grid gap
+        if node.gap is not None and node.gap > 0:
+            config.append(f"grid-gap: {node.gap}")
+
+        return config
+
+    def _build_style_block(self, node: LayoutNode) -> list[str]:
+        """Build D2 style properties for text styling."""
+        styles: list[str] = []
+
+        # Font size mapping
+        if node.text_size:
+            size_map = {
+                "title": 24,
+                "heading": 18,
+                "body": 14,
+                "caption": 11,
+            }
+            if size := size_map.get(
+                node.text_size.value
+                if hasattr(node.text_size, "value")
+                else str(node.text_size)
+            ):
+                styles.append(f"style.font-size: {size}")
+
+        # Bold text
+        if node.text_weight == TextWeight.BOLD:
+            styles.append("style.bold: true")
+
+        # Semantic color mapping
+        if node.semantic_color:
+            color_map = {
+                SemanticColor.PRIMARY: "#0066cc",
+                SemanticColor.SECONDARY: "#666666",
+                SemanticColor.SUCCESS: "#28a745",
+                SemanticColor.WARNING: "#ffc107",
+                SemanticColor.DANGER: "#dc3545",
+                SemanticColor.INFO: "#17a2b8",
+                SemanticColor.DEFAULT: "#333333",
+            }
+            if color := color_map.get(node.semantic_color):
+                styles.append(f'style.font-color: "{color}"')
+
+        return styles
+
+    def _build_unsupported_hints(self, node: LayoutNode) -> str:
+        """Build comment hints for unsupported properties (LLM context)."""
         hints = []
+
+        # Alignment (not fully supported)
         if node.align:
             hints.append(f"align={node.align}")
         if node.justify:
             hints.append(f"justify={node.justify}")
-        if node.gap is not None:
-            hints.append(f"gap={node.gap}")
+        if node.align_content:
+            hints.append(f"align-content={node.align_content}")
+        if node.align_self:
+            hints.append(f"align-self={node.align_self}")
+
+        # Other unsupported
         if node.padding is not None:
             hints.append(f"padding={node.padding}")
         if node.wrap:
             hints.append(f"wrap={node.wrap}")
-        return ", ".join(hints)
-
-    def _build_text_hints(self, node: LayoutNode) -> str:
-        """Build text styling hints string from node properties."""
-        hints = []
-        if node.text_size:
-            hints.append(f"size={node.text_size}")
-        if node.text_weight:
-            hints.append(f"weight={node.text_weight}")
+        if node.flex_ratio != 1:
+            hints.append(f"flex={node.flex_ratio}")
         if node.text_transform:
-            hints.append(f"transform={node.text_transform}")
-        if node.text_align:
-            hints.append(f"align={node.text_align}")
+            hints.append(f"text-transform={node.text_transform}")
+        if node.scrollable:
+            hints.append("scrollable")
+
         return ", ".join(hints)
 
     def _escape_label(self, label: str) -> str:
@@ -176,7 +238,3 @@ class D2Provider(LayoutProvider):
         if any(c in label for c in "{}:;|"):
             return f'"{label}"'
         return label
-
-    def _flex_to_percentage(self, flex_ratio: int) -> int:
-        """Convert flex ratio (1-12) to percentage width."""
-        return round((flex_ratio / 12) * 100)
