@@ -17,7 +17,6 @@ from .lib import (
 )
 from .server import create_server, mcp
 
-
 # =============================================================================
 # Configuration Tests
 # =============================================================================
@@ -151,8 +150,14 @@ class TestToolRegistration:
         """Only essential tools are exposed (no dev/admin tools)."""
         tool_names = set(mcp._tool_manager._tools.keys())
 
-        # Should have exactly 4 tools
-        assert len(tool_names) == 4
+        # Should have exactly 6 tools:
+        # - Core: generate_layout, preview_layout, generate_variations
+        # - Status: status, help, list_models
+        assert len(tool_names) == 6
+
+        # Verify expected tools
+        assert "help" in tool_names
+        assert "list_models" in tool_names
 
         # These should NOT be exposed (dev/admin concerns)
         assert "get_server_info" not in tool_names

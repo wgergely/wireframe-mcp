@@ -31,7 +31,6 @@ from fastmcp import FastMCP
 
 from .lib import (
     TransportType,
-    get_server_capabilities,
     get_server_version,
 )
 
@@ -64,11 +63,56 @@ def _validate_temperature(temperature: float) -> None:
 
 
 # =============================================================================
+# Server Instructions (LLM Guidance)
+# =============================================================================
+
+SERVER_INSTRUCTIONS = """\
+## Wireframe MCP Server
+
+Generates UI wireframe layouts from natural language descriptions.
+
+### First-Use Setup (IMPORTANT)
+**Always call `status()` first** to check server readiness before generating layouts.
+
+If status is not "healthy", report the `action_required` items to the user.
+The user or system admin must resolve setup requirements before proceeding.
+
+### Typical Workflow
+1. `status()` → verify services are ready
+2. `generate_layout(query)` → get layout JSON + human-readable draft
+3. `preview_layout(layout)` → render visual wireframe image (optional)
+
+### Service Dependencies
+- **LLM providers**: Required. Set API keys (OPENAI_API_KEY, etc.)
+- **Kroki**: Required for preview. Start: `python . docker up`
+- **RAG index**: Optional context. Build: `python . dev index build`
+
+### Degraded Operation
+- Without Kroki: Generation works, but `preview_layout` unavailable
+- Without RAG: Generation works, but may lack domain-specific context
+- Without LLM: Server is unhealthy, no generation possible
+
+### Tool Summary
+| Tool | Purpose | Requirements |
+|------|---------|--------------|
+| `status()` | Check health and capabilities | None |
+| `help(topic)` | Get detailed guidance on topics | None |
+| `list_models()` | Show available LLM providers | None |
+| `generate_layout()` | NL → layout JSON + draft | LLM provider |
+| `preview_layout()` | Layout → wireframe image | Kroki service |
+| `generate_variations()` | Generate N layout options | LLM provider |
+
+### Getting Help
+Call `help()` for topics, or `help(topic='workflow')` for guidance.
+"""
+
+# =============================================================================
 # Server Instance
 # =============================================================================
 
 mcp = FastMCP(
     name="wireframe-mcp",
+    instructions=SERVER_INSTRUCTIONS,
 )
 
 
@@ -287,6 +331,203 @@ def status() -> dict[str, Any]:
         result["action_required"] = actions
 
     return result
+
+
+@mcp.tool
+def help(topic: str | None = None) -> dict[str, Any]:
+    """Get detailed help on using this server.
+
+    Use this for on-demand guidance about specific topics.
+    Call without arguments to see available topics.
+
+    Args:
+        topic: Help topic (optional). One of:
+            - "workflow": Step-by-step usage guide
+            - "troubleshooting": Common issues and fixes
+            - "models": Available LLM models
+            - "examples": Example queries and outputs
+
+    Returns:
+        Dictionary with help content for the requested topic,
+        or list of available topics if none specified.
+    """
+    topics = {
+        "workflow": {
+            "title": "Workflow Guide",
+            "content": """
+## Typical Workflow
+
+1. **Check Status First**
+   Call `status()` to verify the server is ready.
+   If status is not "healthy", report issues to the user.
+
+2. **Generate Layout**
+   Call `generate_layout(query)` with a natural language description.
+   Example: "login form with email, password, and remember me checkbox"
+
+3. **Review Draft**
+   The response includes a `draft` text tree for quick review:
+   ```
+   LoginForm [form]
+   ├── Email [input]
+   ├── Password [input]
+   ├── Remember [checkbox]
+   └── Submit [button]
+   ```
+
+4. **Preview (Optional)**
+   Call `preview_layout(layout)` to render a visual wireframe.
+   Returns base64-encoded PNG or SVG.
+
+5. **Iterate**
+   Use `parent_id` parameter to link refinements:
+   `generate_layout("add forgot password link", parent_id="...")`
+
+6. **Compare Options**
+   Use `generate_variations(query, count=3)` to get multiple options.
+""",
+        },
+        "troubleshooting": {
+            "title": "Troubleshooting Guide",
+            "content": """
+## Common Issues
+
+### "No LLM providers configured"
+- **Cause**: No API keys set in environment
+- **Fix**: User must set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env file
+- **Check**: Call `status()` to see which providers are available
+
+### "Kroki not responding"
+- **Cause**: Kroki Docker container not running
+- **Fix**: Run `python . docker up` to start services
+- **Note**: Generation still works, only preview is unavailable
+
+### "RAG index not found"
+- **Cause**: Vector index not built
+- **Fix**: Run `python . dev index build`
+- **Note**: Generation still works, but without context enhancement
+
+### Layout generation fails
+- **Check**: Is status "healthy" or "degraded"?
+- **Check**: Is the query clear and specific?
+- **Try**: Simpler query first, then add complexity
+
+### Preview returns error
+- **Check**: Is Kroki service running? (`status()` shows this)
+- **Check**: Is the layout valid JSON from generate_layout?
+""",
+        },
+        "models": {
+            "title": "Available Models",
+            "content": _get_models_help(),
+        },
+        "examples": {
+            "title": "Example Queries",
+            "content": """
+## Example Queries
+
+### Simple Components
+- "login form with email and password"
+- "navigation bar with logo and menu items"
+- "card with image, title, and description"
+
+### Complex Layouts
+- "dashboard with sidebar navigation and main content area with stats cards"
+- "settings page with sections for profile, notifications, and privacy"
+- "e-commerce product page with image gallery, details, and add to cart"
+
+### Specific Requirements
+- "mobile-friendly contact form with validation hints"
+- "two-column layout with left sidebar 200px wide"
+- "header with centered logo and right-aligned user menu"
+
+### Refinements (use with parent_id)
+- "add a search box to the header"
+- "make the sidebar collapsible"
+- "add loading states to the buttons"
+""",
+        },
+    }
+
+    if topic is None:
+        return {
+            "available_topics": list(topics.keys()),
+            "usage": "Call help(topic='workflow') for detailed guidance",
+        }
+
+    if topic not in topics:
+        return {
+            "error": f"Unknown topic: {topic}",
+            "available_topics": list(topics.keys()),
+        }
+
+    return topics[topic]
+
+
+def _get_models_help() -> str:
+    """Generate models help content dynamically."""
+    try:
+        from src.config import get_available_llm_providers
+        from src.providers import list_providers
+
+        available = get_available_llm_providers()
+        all_providers = list_providers()
+
+        lines = ["## Available LLM Models", ""]
+
+        if available:
+            lines.append(f"**Configured providers**: {', '.join(available)}")
+            lines.append("")
+            lines.append("You can specify a model in `generate_layout(model='...')`.")
+            lines.append("If not specified, the default model is used.")
+        else:
+            lines.append("**No providers configured**")
+            lines.append("")
+            lines.append("Set one of these API keys in .env:")
+            lines.append("- OPENAI_API_KEY")
+            lines.append("- ANTHROPIC_API_KEY")
+            lines.append("- DEEPSEEK_API_KEY")
+
+        lines.append("")
+        lines.append(f"**Supported providers**: {', '.join(all_providers)}")
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Error loading model info: {e}"
+
+
+@mcp.tool
+def list_models() -> dict[str, Any]:
+    """List available LLM models for layout generation.
+
+    Returns which models are configured and can be used
+    with generate_layout(model='...').
+
+    Returns:
+        Dictionary with:
+        - available: List of configured provider names
+        - default: The default model used if none specified
+        - supported: All supported providers (may need API keys)
+    """
+    from src.config import get_available_llm_providers
+
+    try:
+        from src.providers import list_providers
+
+        all_providers = list_providers()
+    except Exception:
+        all_providers = ["openai", "anthropic", "deepseek", "qwen"]
+
+    available = get_available_llm_providers()
+
+    return {
+        "available": available,
+        "default": available[0] if available else None,
+        "supported": all_providers,
+        "note": "Set API keys in .env to enable additional providers"
+        if len(available) < len(all_providers)
+        else "All supported providers are configured",
+    }
 
 
 # =============================================================================

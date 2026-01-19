@@ -246,40 +246,104 @@ def get_server_health() -> ServerHealth:
     )
 
 
+def format_startup_banner(health: ServerHealth) -> str:
+    """Format a startup status banner for logging.
+
+    Args:
+        health: Server health status.
+
+    Returns:
+        Formatted multi-line banner string.
+    """
+    # Status indicators
+    status_icon = {
+        HealthStatus.HEALTHY: "[OK]",
+        HealthStatus.DEGRADED: "[!!]",
+        HealthStatus.UNHEALTHY: "[XX]",
+    }
+
+    def svc_icon(available: bool) -> str:
+        return "[OK]" if available else "[--]"
+
+    # Build service status lines
+    llm_icon = svc_icon(health.llm_providers.available)
+    kroki_icon = svc_icon(health.kroki.available)
+    rag_icon = svc_icon(health.rag_index.available)
+    hist_icon = svc_icon(health.history_db.available)
+
+    # Capability status
+    gen_status = "Yes" if health.can_generate else "No - needs LLM"
+    prev_status = "Yes" if health.can_preview else "No - needs Kroki"
+    rag_status = "Yes" if health.can_use_rag else "No - needs index"
+
+    lines = [
+        "",
+        "=" * 60,
+        f"  Wireframe MCP Server v{health.version}",
+        "=" * 60,
+        f"  Status: {status_icon[health.status]} {health.status.value.upper()}",
+        "",
+        "  Services:",
+        f"    {llm_icon} LLM Providers: {health.llm_providers.message}",
+        f"    {kroki_icon} Kroki Render:  {health.kroki.message}",
+        f"    {rag_icon} RAG Index:     {health.rag_index.message}",
+        f"    {hist_icon} History DB:    {health.history_db.message}",
+        "",
+        "  Capabilities:",
+        f"    generate_layout:    {gen_status}",
+        f"    preview_layout:     {prev_status}",
+        f"    rag_context:        {rag_status}",
+    ]
+
+    # Add action items if not healthy
+    if health.status != HealthStatus.HEALTHY:
+        lines.append("")
+        lines.append("  Action Required:")
+        if not health.can_generate:
+            lines.append("    - Set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env")
+        if not health.can_preview:
+            lines.append("    - Run: python . docker up")
+        if not health.can_use_rag:
+            lines.append("    - Run: python . dev index build")
+
+    lines.extend(
+        [
+            "",
+            "=" * 60,
+            "",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
 def log_startup_status() -> None:
     """Log server health status on startup.
 
     Called during server initialization to warn about missing dependencies.
+    Outputs a formatted banner showing service status and capabilities.
     """
     health = get_server_health()
 
-    logger.info(f"Server health: {health.status.value}")
+    # Log the formatted banner
+    banner = format_startup_banner(health)
+    for line in banner.split("\n"):
+        if line.strip():
+            logger.info(line)
 
-    if not health.can_generate:
-        logger.warning(
-            f"LLM providers unavailable: {health.llm_providers.message}"
-        )
-
-    if not health.can_preview:
-        logger.warning(
-            f"Preview unavailable: {health.kroki.message}"
-        )
-
-    if not health.can_use_rag:
-        logger.info(
-            f"RAG context unavailable: {health.rag_index.message}"
-        )
-
+    # Log summary message at appropriate level
     if health.status == HealthStatus.UNHEALTHY:
         logger.error(
-            "Server is UNHEALTHY - some tools will fail. "
-            "Check configuration and services."
+            "Server is UNHEALTHY - generate_layout will fail. "
+            "Configure LLM provider API keys to proceed."
         )
     elif health.status == HealthStatus.DEGRADED:
         logger.warning(
             "Server is DEGRADED - some features unavailable. "
-            "Generation will work but may lack context or previews."
+            "Generation works but may lack preview or context."
         )
+    else:
+        logger.info("Server is ready - all features available.")
 
 
 __all__ = [
@@ -291,5 +355,6 @@ __all__ = [
     "check_llm_providers",
     "check_history_db",
     "get_server_health",
+    "format_startup_banner",
     "log_startup_status",
 ]
