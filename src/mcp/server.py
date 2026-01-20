@@ -296,6 +296,35 @@ def get_artifact(
     return _get_artifact(artifact_id=artifact_id, include_lineage=include_lineage)
 
 
+@mcp.tool
+def validate_layout(
+    layout: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate a layout structure before implementation.
+
+    Use this before handing off to a coding agent to catch issues early.
+    Checks structure, constraints, and accessibility.
+
+    Args:
+        layout: Layout JSON from generate_layout.
+
+    Returns:
+        Dictionary with:
+        - valid: True if layout passes all checks
+        - errors: List of critical issues that must be fixed
+        - warnings: List of non-critical suggestions
+        - stats: Layout statistics (node count, depth, etc.)
+
+    Example:
+        >>> result = validate_layout(layout)
+        >>> if not result["valid"]:
+        ...     print("Fix these:", result["errors"])
+    """
+    from .tools.validate import validate_layout as _validate
+
+    return _validate(layout=layout)
+
+
 # =============================================================================
 # Status Tools
 # =============================================================================

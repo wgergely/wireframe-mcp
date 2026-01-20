@@ -170,14 +170,21 @@ class TestToolRegistration:
         assert "status" in tool_names
 
     @pytest.mark.unit
+    def test_validate_layout_tool_registered(self):
+        """validate_layout tool is registered for pre-implementation checks."""
+        tool_names = set(mcp._tool_manager._tools.keys())
+
+        assert "validate_layout" in tool_names
+
+    @pytest.mark.unit
     def test_only_essential_tools_exposed(self):
         """Only essential tools are exposed (no dev/admin tools)."""
         tool_names = set(mcp._tool_manager._tools.keys())
 
-        # Should have exactly 7 tools:
-        # - Core: generate_layout, preview_layout, generate_variations, get_artifact
+        # Should have exactly 8 tools:
+        # - Core: generate_layout, preview_layout, generate_variations, get_artifact, validate_layout
         # - Status: status, help, list_models
-        assert len(tool_names) == 7
+        assert len(tool_names) == 8
 
         # Verify expected tools
         assert "help" in tool_names
@@ -185,7 +192,6 @@ class TestToolRegistration:
 
         # These should NOT be exposed (dev/admin concerns)
         assert "get_server_info" not in tool_names
-        assert "validate_layout" not in tool_names
         assert "search_layouts" not in tool_names
         assert "get_history" not in tool_names
         assert "get_sessions" not in tool_names
