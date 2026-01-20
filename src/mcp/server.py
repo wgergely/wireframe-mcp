@@ -455,6 +455,27 @@ def status() -> dict[str, Any]:
     if actions:
         result["action_required"] = actions
 
+    # Add next steps guidance
+    from .health import HealthStatus
+
+    if health.status == HealthStatus.HEALTHY:
+        next_steps = [
+            "Ready! Call generate_layout(query) to create a wireframe.",
+            "Example: generate_layout('login form with email and password')",
+        ]
+    elif health.can_generate:
+        next_steps = [
+            "Generation available. Preview may be limited.",
+            "Call generate_layout(query) to create a wireframe.",
+        ]
+    else:
+        next_steps = [
+            "Server not ready. Review action_required items above.",
+            "Most common: Set OPENAI_API_KEY in .env file.",
+        ]
+
+    result["next_steps"] = next_steps
+
     return result
 
 

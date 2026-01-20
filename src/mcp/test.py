@@ -310,6 +310,22 @@ class TestValidationHelpers:
 # =============================================================================
 
 
+@requires_fastmcp
+class TestNextStepsGuidance:
+    """Tests for next_steps in tool responses."""
+
+    @pytest.mark.unit
+    def test_status_includes_next_steps(self):
+        """status() includes next_steps guidance."""
+        from .server import status
+
+        result = status.fn()
+
+        assert "next_steps" in result
+        assert isinstance(result["next_steps"], list)
+        assert len(result["next_steps"]) > 0
+
+
 @pytest.mark.mcp
 class TestMCPProtocol:
     """Integration tests using MCP client protocol.
