@@ -3,6 +3,28 @@
 import pytest
 
 
+class TestRefineLayout:
+    """Tests for refine_layout tool."""
+
+    @pytest.mark.unit
+    def test_refine_layout_exists(self):
+        """refine_layout function is importable."""
+        from src.mcp.tools.refine import refine_layout
+
+        assert callable(refine_layout)
+
+    @pytest.mark.unit
+    def test_refine_layout_requires_artifact_id(self):
+        """refine_layout requires artifact_id parameter."""
+        import inspect
+
+        from src.mcp.tools.refine import refine_layout
+
+        sig = inspect.signature(refine_layout)
+        assert "artifact_id" in sig.parameters
+        assert "feedback" in sig.parameters
+
+
 class TestGenerateLayoutStats:
     """Tests for generate_layout stats output."""
 

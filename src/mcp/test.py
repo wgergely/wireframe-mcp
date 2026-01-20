@@ -184,15 +184,22 @@ class TestToolRegistration:
         assert "search_layouts" in tool_names
 
     @pytest.mark.unit
+    def test_refine_layout_tool_registered(self):
+        """refine_layout tool is registered for iterative feedback."""
+        tool_names = set(mcp._tool_manager._tools.keys())
+
+        assert "refine_layout" in tool_names
+
+    @pytest.mark.unit
     def test_only_essential_tools_exposed(self):
         """Only essential tools are exposed (no dev/admin tools)."""
         tool_names = set(mcp._tool_manager._tools.keys())
 
-        # Should have exactly 9 tools:
+        # Should have exactly 10 tools:
         # - Core: generate_layout, preview_layout, generate_variations,
-        #         get_artifact, validate_layout, search_layouts
+        #         get_artifact, validate_layout, search_layouts, refine_layout
         # - Status: status, help, list_models
-        assert len(tool_names) == 9
+        assert len(tool_names) == 10
 
         # Verify expected tools
         assert "help" in tool_names

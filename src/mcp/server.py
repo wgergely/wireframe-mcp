@@ -354,6 +354,43 @@ def search_layouts(
     return _search(query=query, k=k)
 
 
+@mcp.tool
+def refine_layout(
+    artifact_id: str,
+    feedback: str,
+    model: str | None = None,
+    temperature: float = 0.7,
+) -> dict[str, Any]:
+    """Refine an existing layout based on feedback.
+
+    Use this when the user wants to MODIFY an existing layout
+    rather than generate a completely new one.
+
+    Args:
+        artifact_id: ID of the layout to refine.
+        feedback: What to change (e.g., "move sidebar to right").
+        model: LLM model to use (optional).
+        temperature: Creativity level 0.0-2.0. Default: 0.7
+
+    Returns:
+        Dictionary with new layout and parent_id link.
+
+    Example:
+        User: "I like this but move the sidebar to the right"
+        -> refine_layout(artifact_id, "move sidebar to right")
+    """
+    _validate_temperature(temperature)
+
+    from .tools.refine import refine_layout as _refine
+
+    return _refine(
+        artifact_id=artifact_id,
+        feedback=feedback,
+        model=model,
+        temperature=temperature,
+    )
+
+
 # =============================================================================
 # Status Tools
 # =============================================================================
