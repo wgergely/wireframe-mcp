@@ -325,6 +325,35 @@ def validate_layout(
     return _validate(layout=layout)
 
 
+@mcp.tool
+def search_layouts(
+    query: str,
+    k: int = 5,
+) -> dict[str, Any]:
+    """Search for similar layouts in the corpus.
+
+    Use this to find inspiration or see what layouts exist
+    for similar UI patterns.
+
+    Args:
+        query: Natural language description to search for.
+        k: Number of results (1-20). Default: 5
+
+    Returns:
+        Dictionary with:
+        - results: List of similar layouts with scores
+        - total_in_index: Total layouts in the index
+
+    Note: Requires RAG index to be built.
+    """
+    if not 1 <= k <= 20:
+        raise ValueError(f"k must be 1-20, got {k}")
+
+    from .tools.search import search_layouts as _search
+
+    return _search(query=query, k=k)
+
+
 # =============================================================================
 # Status Tools
 # =============================================================================
