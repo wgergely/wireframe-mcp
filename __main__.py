@@ -2168,16 +2168,16 @@ def handle_mcp_command(argv: list[str]) -> int:
         print("  python . mcp serve                  # HTTP on port 18080")
         print("  python . mcp serve --port 8080     # HTTP on custom port")
         print("\nClaude Desktop Configuration:")
-        print('  Add to claude_desktop_config.json:')
-        print('  {')
+        print("  Add to claude_desktop_config.json:")
+        print("  {")
         print('    "mcpServers": {')
         print('      "wireframe": {')
         print('        "command": "python",')
         print('        "args": [".", "mcp", "run"],')
         print('        "cwd": "/path/to/wireframe-mcp"')
-        print('      }')
-        print('    }')
-        print('  }')
+        print("      }")
+        print("    }")
+        print("  }")
         return 1
 
     subcommand = argv[0]

@@ -8,7 +8,7 @@ from src.output import LayoutOutput, OutputGenerator, format_layout_tree
 
 
 @pytest.fixture
-def sample_layout():
+def dashboard_layout():
     """Create sample layout for testing."""
     return LayoutNode(
         id="root",
@@ -48,23 +48,23 @@ class TestFormatLayoutTree:
         assert "container" in result
 
     @pytest.mark.unit
-    def test_nested_tree(self, sample_layout):
+    def test_nested_tree(self, dashboard_layout):
         """Test formatting nested tree."""
-        result = format_layout_tree(sample_layout)
+        result = format_layout_tree(dashboard_layout)
         assert "Dashboard" in result
         assert "Sidebar" in result
         assert "├──" in result or "└──" in result
 
     @pytest.mark.unit
-    def test_horizontal_marker(self, sample_layout):
+    def test_horizontal_marker(self, dashboard_layout):
         """Test horizontal orientation is marked."""
-        result = format_layout_tree(sample_layout)
+        result = format_layout_tree(dashboard_layout)
         assert "horizontal" in result
 
     @pytest.mark.unit
-    def test_flex_ratio_percentage(self, sample_layout):
+    def test_flex_ratio_percentage(self, dashboard_layout):
         """Test flex ratio shown as percentage."""
-        result = format_layout_tree(sample_layout)
+        result = format_layout_tree(dashboard_layout)
         assert "25%" in result  # flex_ratio=3 -> 25%
         assert "75%" in result  # flex_ratio=9 -> 75%
 
@@ -73,10 +73,10 @@ class TestOutputGenerator:
     """Tests for OutputGenerator class."""
 
     @pytest.mark.unit
-    def test_generate_d2(self, sample_layout):
+    def test_generate_d2(self, dashboard_layout):
         """Test generating D2 output."""
         gen = OutputGenerator(default_provider="d2")
-        output = gen.generate(sample_layout)
+        output = gen.generate(dashboard_layout)
 
         assert isinstance(output, LayoutOutput)
         assert output.provider == "d2"
@@ -84,41 +84,41 @@ class TestOutputGenerator:
         assert "Dashboard" in output.dsl_code
 
     @pytest.mark.unit
-    def test_generate_plantuml(self, sample_layout):
+    def test_generate_plantuml(self, dashboard_layout):
         """Test generating PlantUML output."""
         gen = OutputGenerator()
-        output = gen.generate(sample_layout, provider="plantuml")
+        output = gen.generate(dashboard_layout, provider="plantuml")
 
         assert output.provider == "plantuml"
         assert "@startsalt" in output.dsl_code
 
     @pytest.mark.unit
-    def test_output_contains_node(self, sample_layout):
+    def test_output_contains_node(self, dashboard_layout):
         """Test output contains original node."""
         gen = OutputGenerator()
-        output = gen.generate(sample_layout)
-        assert output.node == sample_layout
+        output = gen.generate(dashboard_layout)
+        assert output.node == dashboard_layout
 
     @pytest.mark.unit
-    def test_generate_from_context(self, sample_layout):
+    def test_generate_from_context(self, dashboard_layout):
         """Test generating output from TranspilationContext."""
         context = TranspilationContext(
-            node=sample_layout,
+            node=dashboard_layout,
             target_provider="plantuml",
         )
         gen = OutputGenerator()
         output = gen.generate_from_context(context)
 
         assert output.provider == "plantuml"
-        assert output.node == sample_layout
+        assert output.node == dashboard_layout
         assert "@startsalt" in output.dsl_code
         assert "Dashboard" in output.text_tree
 
     @pytest.mark.unit
-    def test_generate_from_context_uses_target_provider(self, sample_layout):
+    def test_generate_from_context_uses_target_provider(self, dashboard_layout):
         """Context's target_provider overrides generator default."""
         context = TranspilationContext(
-            node=sample_layout,
+            node=dashboard_layout,
             target_provider="d2",
         )
         gen = OutputGenerator(default_provider="plantuml")
@@ -129,9 +129,9 @@ class TestOutputGenerator:
         assert "{" in output.dsl_code  # D2 uses braces
 
     @pytest.mark.unit
-    def test_generate_from_context_uses_context_default(self, sample_layout):
+    def test_generate_from_context_uses_context_default(self, dashboard_layout):
         """Context defaults to d2 when target_provider not specified."""
-        context = TranspilationContext(node=sample_layout)
+        context = TranspilationContext(node=dashboard_layout)
         gen = OutputGenerator(default_provider="plantuml")
         output = gen.generate_from_context(context)
 
@@ -139,10 +139,10 @@ class TestOutputGenerator:
         assert output.provider == "d2"
 
     @pytest.mark.unit
-    def test_default_provider_d2(self, sample_layout):
+    def test_default_provider_d2(self, dashboard_layout):
         """Generator defaults to d2 provider."""
         gen = OutputGenerator()  # No explicit default
-        output = gen.generate(sample_layout)
+        output = gen.generate(dashboard_layout)
         assert output.provider == "d2"
 
 
@@ -150,29 +150,29 @@ class TestLayoutOutput:
     """Tests for LayoutOutput dataclass."""
 
     @pytest.mark.unit
-    def test_layout_output_fields(self, sample_layout):
+    def test_layout_output_fields(self, dashboard_layout):
         """LayoutOutput has all expected fields."""
         output = LayoutOutput(
             text_tree="tree text",
             dsl_code="dsl code",
-            node=sample_layout,
+            node=dashboard_layout,
             provider="test",
         )
         assert output.text_tree == "tree text"
         assert output.dsl_code == "dsl code"
-        assert output.node == sample_layout
+        assert output.node == dashboard_layout
         assert output.provider == "test"
         assert output.image_bytes is None
         assert output.image_format is None
 
     @pytest.mark.unit
-    def test_layout_output_with_image(self, sample_layout):
+    def test_layout_output_with_image(self, dashboard_layout):
         """LayoutOutput can include image data."""
         image_data = b"\x89PNG\r\n"
         output = LayoutOutput(
             text_tree="tree",
             dsl_code="dsl",
-            node=sample_layout,
+            node=dashboard_layout,
             provider="test",
             image_bytes=image_data,
             image_format="png",
@@ -276,8 +276,8 @@ class TestOutputGeneratorProviderHandling:
     """Tests for OutputGenerator provider handling."""
 
     @pytest.mark.unit
-    def test_invalid_provider_raises_error(self, sample_layout):
+    def test_invalid_provider_raises_error(self, dashboard_layout):
         """Invalid provider name raises KeyError."""
         gen = OutputGenerator()
         with pytest.raises(KeyError, match="Unknown provider"):
-            gen.generate(sample_layout, provider="nonexistent_provider")
+            gen.generate(dashboard_layout, provider="nonexistent_provider")

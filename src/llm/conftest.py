@@ -27,32 +27,77 @@ class MockLLMBackend:
     "id": "login-page",
     "type": "container",
     "orientation": "vertical",
+    "align": "center",
+    "justify": "center",
+    "padding": 40,
     "children": [
-        {"id": "email", "type": "input", "label": "Email"},
-        {"id": "password", "type": "input", "label": "Password"},
-        {"id": "submit", "type": "button", "label": "Log In"}
+        {
+            "id": "login-card",
+            "type": "card",
+            "padding": 32,
+            "gap": 16,
+            "children": [
+                {"id": "header", "type": "text", "label": "Welcome Back"},
+                {"id": "email-input", "type": "input", "label": "Email Address"},
+                {"id": "password-input", "type": "input", "label": "Password"},
+                {"id": "submit-btn", "type": "button", "label": "Log In"}
+            ]
+        }
     ]
 }"""
 
     MOCK_DASHBOARD_JSON = """{
-    "id": "dashboard",
+    "id": "dashboard-root",
     "type": "container",
     "orientation": "horizontal",
     "children": [
-        {"id": "sidebar", "type": "toolbar", "orientation": "vertical", "children": []},
-        {"id": "main", "type": "container", "orientation": "vertical", "children": []}
+        {
+            "id": "sidebar",
+            "type": "toolbar",
+            "orientation": "vertical",
+            "flex_ratio": 2,
+            "padding": 16,
+            "children": [
+                {"id": "menu-1", "type": "button", "label": "Overview"},
+                {"id": "menu-2", "type": "button", "label": "Sales"},
+                {"id": "menu-3", "type": "button", "label": "Settings"}
+            ]
+        },
+        {
+            "id": "main-area",
+            "type": "container",
+            "flex_ratio": 10,
+            "orientation": "vertical",
+            "padding": 24,
+            "children": [
+                {"id": "top-bar", "type": "toolbar", "orientation": "horizontal"},
+                {"id": "stats-grid", "type": "container", "orientation": "horizontal"}
+            ]
+        }
     ]
 }"""
 
     MOCK_FORM_JSON = """{
     "id": "form",
     "type": "card",
+    "padding": 24,
+    "gap": 16,
     "children": [
         {"id": "title", "type": "text", "label": "Contact Us"},
         {"id": "name", "type": "input", "label": "Name"},
         {"id": "email", "type": "input", "label": "Email"},
         {"id": "message", "type": "input", "label": "Message"},
         {"id": "submit", "type": "button", "label": "Send"}
+    ]
+}"""
+
+    MOCK_SIMPLE_JSON = """{
+    "id": "simple-container",
+    "type": "container",
+    "orientation": "vertical",
+    "children": [
+        {"id": "header", "type": "toolbar", "label": "Header"},
+        {"id": "content", "type": "container"}
     ]
 }"""
 
@@ -95,16 +140,24 @@ class MockLLMBackend:
         """
         from src.llm.backend.base import GenerationResult
 
-        prompt_lower = prompt.lower()
+        # Extract the actual user query from the full prompt
+        # The prompt format includes: 'for this request:\n\n"<query>"'
+        query = prompt.lower()
+        if "for this request:" in query:
+            # Extract just the query portion
+            query = query.split("for this request:")[-1].strip()
 
-        if "dashboard" in prompt_lower:
-            content = self.MOCK_DASHBOARD_JSON
-        elif "form" in prompt_lower or "contact" in prompt_lower:
-            content = self.MOCK_FORM_JSON
-        elif "login" in prompt_lower or "sign" in prompt_lower:
+        # Check keywords in the extracted query
+        if "login" in query or "sign in" in query:
             content = self.MOCK_LOGIN_JSON
-        else:
+        elif "dashboard" in query:
             content = self.MOCK_DASHBOARD_JSON
+        elif "form" in query or "contact" in query:
+            content = self.MOCK_FORM_JSON
+        elif "simple" in query or "basic" in query:
+            content = self.MOCK_SIMPLE_JSON
+        else:
+            content = self.MOCK_SIMPLE_JSON
 
         return GenerationResult(
             content=content,

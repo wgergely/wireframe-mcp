@@ -129,12 +129,12 @@ class TestListModes:
         modes = list_modes()
         assert isinstance(modes, list)
 
-    def test_list_modes_includes_dev_and_prod(self) -> None:
-        """list_modes includes dev, hotreload, and prod modes."""
+    def test_list_modes_includes_dev_and_production(self) -> None:
+        """list_modes includes dev, hotreload, and production modes."""
         modes = list_modes()
         assert "dev" in modes  # backwards compat alias for hotreload
         assert "hotreload" in modes
-        assert "prod" in modes
+        assert "production" in modes
 
     def test_list_modes_sorted(self) -> None:
         """list_modes returns sorted list."""
@@ -151,11 +151,11 @@ class TestListBackends:
         backends = list_backends()
         assert isinstance(backends, list)
 
-    def test_list_backends_includes_kroki_and_server(self) -> None:
-        """list_backends includes kroki and server service files."""
+    def test_list_backends_includes_core_and_renderer(self) -> None:
+        """list_backends includes core and renderer service files."""
         backends = list_backends()
-        assert "kroki" in backends
-        assert "server" in backends
+        assert "core" in backends
+        assert "renderer" in backends
 
     def test_list_backends_sorted(self) -> None:
         """list_backends returns sorted list."""

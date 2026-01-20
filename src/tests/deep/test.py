@@ -10,137 +10,16 @@ These tests verify:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 
-from src.mid import LayoutNode, Orientation, validate_layout
+from src.llm.conftest import MockLLMBackend
+from src.mid import LayoutNode, Orientation
 from src.schema import ComponentType
 
 if TYPE_CHECKING:
     from src.render import RenderClient
-
-
-# =============================================================================
-# Mock LLM Backend (from workbench.py)
-# =============================================================================
-
-
-class MockLLMBackend:
-    """Mock LLM backend for pipeline testing without API keys.
-
-    Provides deterministic responses based on prompt keywords for
-    testing the full generation pipeline.
-    """
-
-    MOCK_LOGIN_JSON = """{
-    "id": "login-page",
-    "type": "container",
-    "orientation": "vertical",
-    "align": "center",
-    "justify": "center",
-    "padding": 40,
-    "children": [
-        {
-            "id": "login-card",
-            "type": "card",
-            "padding": 32,
-            "gap": 16,
-            "children": [
-                {"id": "header", "type": "text", "label": "Welcome Back"},
-                {"id": "email-input", "type": "input", "label": "Email Address"},
-                {"id": "password-input", "type": "input", "label": "Password"},
-                {"id": "submit-btn", "type": "button", "label": "Log In"}
-            ]
-        }
-    ]
-}"""
-
-    MOCK_DASHBOARD_JSON = """{
-    "id": "dashboard-root",
-    "type": "container",
-    "orientation": "horizontal",
-    "children": [
-        {
-            "id": "sidebar",
-            "type": "toolbar",
-            "orientation": "vertical",
-            "flex_ratio": 2,
-            "padding": 16,
-            "children": [
-                {"id": "menu-1", "type": "button", "label": "Overview"},
-                {"id": "menu-2", "type": "button", "label": "Sales"},
-                {"id": "menu-3", "type": "button", "label": "Settings"}
-            ]
-        },
-        {
-            "id": "main-area",
-            "type": "container",
-            "flex_ratio": 10,
-            "orientation": "vertical",
-            "padding": 24,
-            "children": [
-                {"id": "top-bar", "type": "toolbar", "orientation": "horizontal"},
-                {"id": "stats-grid", "type": "container", "orientation": "horizontal"}
-            ]
-        }
-    ]
-}"""
-
-    @property
-    def model_name(self) -> str:
-        return "mock-model-v1"
-
-    @property
-    def provider(self) -> str:
-        return "mock"
-
-    @property
-    def supports_json_mode(self) -> bool:
-        return True
-
-    @property
-    def context_window(self) -> int:
-        return 4096
-
-    def generate(
-        self,
-        prompt: str,
-        *,
-        system_prompt: str | None = None,
-        config: Any | None = None,
-    ):
-        """Generate mock response based on prompt keywords."""
-        from src.llm.backend.base import GenerationResult
-
-        prompt_lower = prompt.lower()
-
-        if "dashboard" in prompt_lower:
-            content = self.MOCK_DASHBOARD_JSON
-        elif "login" in prompt_lower:
-            content = self.MOCK_LOGIN_JSON
-        else:
-            content = self.MOCK_DASHBOARD_JSON
-
-        return GenerationResult(
-            content=content,
-            finish_reason="stop",
-            model=self.model_name,
-            usage={"total_tokens": 100},
-        )
-
-    def generate_json(
-        self,
-        prompt: str,
-        *,
-        system_prompt: str | None = None,
-        config: Any | None = None,
-    ) -> dict[str, Any]:
-        """Generate mock JSON response."""
-        import json
-
-        result = self.generate(prompt, system_prompt=system_prompt, config=config)
-        return json.loads(result.content)
 
 
 # =============================================================================
@@ -249,45 +128,6 @@ class TestValidationEdgeCases:
                 type=ComponentType.CONTAINER,
                 flex_ratio=15,  # Invalid > 12
             )
-
-    @pytest.mark.unit
-    def test_button_with_children_constraint(self):
-        """Button with children triggers constraint violation."""
-        node = LayoutNode(
-            id="root",
-            type=ComponentType.BUTTON,
-            label="Click Me",
-            children=[LayoutNode(id="child", type=ComponentType.ICON)],
-        )
-
-        errors = validate_layout(node)
-        # Check if constraint validation is implemented
-        constraint_errors = [
-            e for e in errors if e.error_type == "constraint_violation"
-        ]
-        # Note: This may pass if constraint checking not yet implemented
-        if not constraint_errors:
-            pytest.skip("Constraint violation checking not yet implemented")
-
-    @pytest.mark.unit
-    def test_navbar_max_children_constraint(self):
-        """Navbar with too many children triggers constraint."""
-        nav_children = [
-            LayoutNode(id=f"item-{i}", type=ComponentType.ICON) for i in range(8)
-        ]
-        overpopulated_nav = LayoutNode(
-            id="nav",
-            type=ComponentType.NAVBAR,
-            children=nav_children,
-        )
-
-        errors = validate_layout(overpopulated_nav)
-        constraint_errors = [
-            e for e in errors if e.error_type == "constraint_violation"
-        ]
-        # Note: This may pass if constraint checking not yet implemented
-        if not constraint_errors:
-            pytest.skip("Max children constraint checking not yet implemented")
 
 
 # =============================================================================

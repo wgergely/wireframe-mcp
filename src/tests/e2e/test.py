@@ -7,8 +7,8 @@ import pytest
 
 from src.ir import TranspilationContext
 from src.llm import LayoutGenerator
-from src.output import OutputGenerator, format_layout_tree
-from src.providers import get_provider, list_providers
+from src.output import OutputGenerator
+from src.providers import get_provider
 
 # =============================================================================
 # Parametrized E2E Test Cases
@@ -162,53 +162,6 @@ class TestFullPipelineParametrized:
         assert dsl
         # PlantUML Salt syntax
         assert "@startsalt" in dsl or "{" in dsl
-
-
-class TestProviderRegistry:
-    """Tests for provider discovery."""
-
-    @pytest.mark.unit
-    def test_list_providers(self):
-        """Test that providers are registered."""
-        providers = list_providers()
-        assert "d2" in providers
-        assert "plantuml" in providers
-
-    @pytest.mark.unit
-    def test_get_d2_provider(self):
-        """Test getting D2 provider."""
-        provider = get_provider("d2")
-        assert provider.name == "d2"
-        assert provider.file_extension == ".d2"
-
-    @pytest.mark.unit
-    def test_get_plantuml_provider(self):
-        """Test getting PlantUML provider."""
-        provider = get_provider("plantuml")
-        assert provider.name == "plantuml"
-
-
-class TestOutputGenerator:
-    """Tests for output generation."""
-
-    @pytest.mark.unit
-    def test_format_layout_tree_basic(self):
-        """Test text tree formatting."""
-        from src.mid import ComponentType, LayoutNode
-
-        node = LayoutNode(
-            id="root",
-            type=ComponentType.CONTAINER,
-            label="Test",
-            children=[
-                LayoutNode(id="child", type=ComponentType.BUTTON, label="Click"),
-            ],
-        )
-
-        tree = format_layout_tree(node)
-        assert "Test" in tree
-        assert "Click" in tree
-        assert "button" in tree.lower()
 
 
 # =============================================================================
