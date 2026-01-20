@@ -266,6 +266,36 @@ def generate_variations(
     }
 
 
+@mcp.tool
+def get_artifact(
+    artifact_id: str,
+    include_lineage: bool = False,
+) -> dict[str, Any]:
+    """Retrieve a previously generated layout by its artifact ID.
+
+    Use this after generate_variations to get the full layout for
+    a specific variation you want to preview.
+
+    Args:
+        artifact_id: The artifact UUID from generate_layout or variations.
+        include_lineage: Include parent/child relationships. Default: False
+
+    Returns:
+        Dictionary with:
+        - artifact: Full artifact data including layout, draft, stats
+        - lineage: Parent/child IDs (if include_lineage=True)
+
+    Example workflow:
+        1. generate_variations("dashboard", count=3) → get artifact IDs
+        2. User picks variation 2
+        3. get_artifact(artifact_id) → get full layout
+        4. preview_layout(layout) → render wireframe
+    """
+    from .tools.history import get_artifact as _get_artifact
+
+    return _get_artifact(artifact_id=artifact_id, include_lineage=include_lineage)
+
+
 # =============================================================================
 # Status Tools
 # =============================================================================

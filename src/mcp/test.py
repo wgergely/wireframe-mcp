@@ -133,6 +133,13 @@ class TestToolRegistration:
     """Tests for MCP tool registration."""
 
     @pytest.mark.unit
+    def test_get_artifact_tool_registered(self):
+        """get_artifact tool is registered for variations workflow."""
+        tool_names = set(mcp._tool_manager._tools.keys())
+
+        assert "get_artifact" in tool_names
+
+    @pytest.mark.unit
     def test_core_tools_registered(self):
         """Core LLM tools are registered on server."""
         tool_names = set(mcp._tool_manager._tools.keys())
@@ -150,10 +157,10 @@ class TestToolRegistration:
         """Only essential tools are exposed (no dev/admin tools)."""
         tool_names = set(mcp._tool_manager._tools.keys())
 
-        # Should have exactly 6 tools:
-        # - Core: generate_layout, preview_layout, generate_variations
+        # Should have exactly 7 tools:
+        # - Core: generate_layout, preview_layout, generate_variations, get_artifact
         # - Status: status, help, list_models
-        assert len(tool_names) == 6
+        assert len(tool_names) == 7
 
         # Verify expected tools
         assert "help" in tool_names
@@ -164,7 +171,6 @@ class TestToolRegistration:
         assert "validate_layout" not in tool_names
         assert "search_layouts" not in tool_names
         assert "get_history" not in tool_names
-        assert "get_artifact" not in tool_names
         assert "get_sessions" not in tool_names
         assert "get_storage_stats" not in tool_names
 
