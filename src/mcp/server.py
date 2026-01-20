@@ -69,41 +69,54 @@ def _validate_temperature(temperature: float) -> None:
 SERVER_INSTRUCTIONS = """\
 ## Wireframe MCP Server
 
-Generates UI wireframe layouts from natural language descriptions.
+Generates UI wireframe layouts from natural language. Prevents implementation
+miscommunication by validating understanding BEFORE coding begins.
 
-### First-Use Setup (IMPORTANT)
-**Always call `status()` first** to check server readiness before generating layouts.
+### Quick Start
+1. `status()` → check readiness
+2. `generate_layout("your UI description")` → get draft
+3. Review draft with user
+4. `preview_layout(layout)` → visual wireframe (optional)
+5. `validate_layout(layout)` → check before implementation
 
-If status is not "healthy", report the `action_required` items to the user.
-The user or system admin must resolve setup requirements before proceeding.
+### Complete Workflow
 
-### Typical Workflow
-1. `status()` → verify services are ready
-2. `generate_layout(query)` → get layout JSON + human-readable draft
-3. `preview_layout(layout)` → render visual wireframe image (optional)
+**Creating Layouts:**
+- `generate_layout(query)` - Single layout from description
+- `generate_variations(query, count=3)` - Multiple options to compare
+- `refine_layout(artifact_id, feedback)` - Iterate on existing layout
 
-### Service Dependencies
-- **LLM providers**: Required. Set API keys (OPENAI_API_KEY, etc.)
-- **Kroki**: Required for preview. Start: `python . docker up`
-- **RAG index**: Optional context. Build: `python . dev index build`
+**Reviewing:**
+- `get_artifact(id)` - Get full layout from artifact ID
+- `search_layouts(query)` - Find similar examples in corpus
+- `validate_layout(layout)` - Check for issues
 
-### Degraded Operation
-- Without Kroki: Generation works, but `preview_layout` unavailable
-- Without RAG: Generation works, but may lack domain-specific context
-- Without LLM: Server is unhealthy, no generation possible
+**Preview:**
+- `preview_layout(layout)` - Render visual wireframe
 
-### Tool Summary
-| Tool | Purpose | Requirements |
-|------|---------|--------------|
-| `status()` | Check health and capabilities | None |
-| `help(topic)` | Get detailed guidance on topics | None |
-| `list_models()` | Show available LLM providers | None |
-| `generate_layout()` | NL → layout JSON + draft | LLM provider |
-| `preview_layout()` | Layout → wireframe image | Kroki service |
-| `generate_variations()` | Generate N layout options | LLM provider |
+### Iteration Example
+```
+User: "Create a dashboard"
+→ generate_layout("dashboard with sidebar")
+→ User: "Make the sidebar narrower"
+→ refine_layout(artifact_id, "make sidebar narrower")
+→ User: "Perfect, show me the wireframe"
+→ preview_layout(layout)
+→ User: "Approved!"
+→ validate_layout(layout)  # Check before implementation
+```
+
+### Service Status
+| Service | Required For | If Missing |
+|---------|-------------|------------|
+| LLM provider | Generation | Set API key in .env |
+| Kroki | Preview | Run: python . docker up |
+| RAG index | Context | Run: python . dev index build |
 
 ### Getting Help
-Call `help()` for topics, or `help(topic='workflow')` for guidance.
+- `help()` - List topics
+- `help('workflow')` - Step-by-step guide
+- `help('troubleshooting')` - Common issues
 """
 
 # =============================================================================
