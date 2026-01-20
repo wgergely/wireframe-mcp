@@ -118,9 +118,21 @@ def generate_layout(
         layout_dict = output.context.node.model_dump(mode="json")
         draft = format_layout_tree(output.context.node)
 
+        # Add RAG status for explicit feedback
+        rag_status = {
+            "available": rag_available,
+            "requested": include_rag,
+            "reason": (
+                "RAG context included"
+                if rag_available
+                else "RAG index not found - run: python . dev index build"
+            ),
+        }
+
         result: dict[str, Any] = {
             "layout": layout_dict,
             "draft": draft,
+            "rag_status": rag_status,
             "stats": {
                 "attempts": output.stats.attempts,
                 "tokens": output.stats.total_tokens,

@@ -82,3 +82,43 @@ def mock_generator(monkeypatch):
             return MockOutput()
 
     monkeypatch.setattr("src.llm.LayoutGenerator", MockLayoutGenerator)
+
+
+class TestGenerateLayoutRAGStatus:
+    """Tests for RAG status in generate_layout response."""
+
+    @pytest.mark.unit
+    def test_response_includes_rag_status(self, mock_generator):
+        """Response includes explicit RAG availability status."""
+        from src.mcp.tools.generate import generate_layout
+
+        result = generate_layout(
+            query="test",
+            include_rag=True,
+            persist=False,
+        )
+
+        # Should explicitly report RAG status
+        assert "rag_status" in result
+        assert "available" in result["rag_status"]
+        assert "reason" in result["rag_status"]
+
+    @pytest.mark.unit
+    def test_rag_status_reports_unavailable_reason(self, mock_generator, monkeypatch):
+        """RAG status explains why RAG is unavailable."""
+        # Mock get_vector_store to return None (at cache module level)
+        monkeypatch.setattr(
+            "src.mcp.tools.cache.get_vector_store",
+            lambda: None,
+        )
+
+        from src.mcp.tools.generate import generate_layout
+
+        result = generate_layout(
+            query="test",
+            include_rag=True,
+            persist=False,
+        )
+
+        assert result["rag_status"]["available"] is False
+        assert "index" in result["rag_status"]["reason"].lower()
