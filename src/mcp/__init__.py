@@ -31,10 +31,21 @@ from .lib import (
     get_server_capabilities,
     get_server_version,
 )
-from .server import create_server, mcp, run_server
+
+# Conditionally import server module (requires fastmcp)
+try:
+    from .server import create_server, mcp, run_server
+
+    _FASTMCP_AVAILABLE = True
+except ImportError:
+    # fastmcp not installed - server features unavailable
+    create_server = None  # type: ignore[assignment,misc]
+    mcp = None  # type: ignore[assignment]
+    run_server = None  # type: ignore[assignment]
+    _FASTMCP_AVAILABLE = False
 
 __all__ = [
-    # Server instance
+    # Server instance (requires fastmcp)
     "mcp",
     "create_server",
     "run_server",

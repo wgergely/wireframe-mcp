@@ -15,7 +15,22 @@ from .lib import (
     get_server_capabilities,
     get_server_version,
 )
-from .server import create_server, mcp
+
+# Conditionally import server module (requires fastmcp)
+try:
+    from .server import create_server, mcp
+
+    FASTMCP_AVAILABLE = True
+except ImportError:
+    create_server = None  # type: ignore[assignment,misc]
+    mcp = None  # type: ignore[assignment]
+    FASTMCP_AVAILABLE = False
+
+# Skip marker for tests requiring fastmcp
+requires_fastmcp = pytest.mark.skipif(
+    not FASTMCP_AVAILABLE,
+    reason="fastmcp not installed",
+)
 
 # =============================================================================
 # Configuration Tests
@@ -103,6 +118,7 @@ class TestServerUtilities:
 # =============================================================================
 
 
+@requires_fastmcp
 class TestServerInstance:
     """Tests for FastMCP server instance."""
 
@@ -129,6 +145,7 @@ class TestServerInstance:
 # =============================================================================
 
 
+@requires_fastmcp
 class TestToolRegistration:
     """Tests for MCP tool registration."""
 
@@ -180,6 +197,7 @@ class TestToolRegistration:
 # =============================================================================
 
 
+@requires_fastmcp
 class TestStatusTool:
     """Tests for status tool logic."""
 
@@ -224,6 +242,7 @@ class TestStatusTool:
 # =============================================================================
 
 
+@requires_fastmcp
 class TestValidationHelpers:
     """Tests for parameter validation functions."""
 
@@ -275,46 +294,37 @@ class TestValidationHelpers:
 class TestMCPProtocol:
     """Integration tests using MCP client protocol.
 
-    These tests require pytest-asyncio and test the full MCP protocol flow.
+    These tests require pytest-asyncio and use the mcp_client fixture
+    which handles fastmcp availability checking automatically.
     """
 
     @pytest.mark.asyncio
-    async def test_client_can_connect(self):
+    async def test_client_can_connect(self, mcp_client):
         """Client can connect to server."""
-        try:
-            from fastmcp import Client
-
-            async with Client(mcp) as client:
-                assert client is not None
-        except ImportError:
-            pytest.skip("fastmcp not installed")
+        assert mcp_client is not None
 
     @pytest.mark.asyncio
-    async def test_client_can_list_tools(self):
+    async def test_client_can_list_tools(self, mcp_client):
         """Client can list available tools."""
-        try:
-            from fastmcp import Client
+        tools = await mcp_client.list_tools()
 
-            async with Client(mcp) as client:
-                tools = await client.list_tools()
-
-                tool_names = [t.name for t in tools]
-                assert "status" in tool_names
-                assert "generate_layout" in tool_names
-                assert "preview_layout" in tool_names
-                assert "generate_variations" in tool_names
-        except ImportError:
-            pytest.skip("fastmcp not installed")
+        tool_names = [t.name for t in tools]
+        assert "status" in tool_names
+        assert "generate_layout" in tool_names
+        assert "preview_layout" in tool_names
+        assert "generate_variations" in tool_names
 
     @pytest.mark.asyncio
-    async def test_client_can_call_status(self):
+    async def test_client_can_call_status(self, mcp_client):
         """Client can call status tool."""
-        try:
-            from fastmcp import Client
+        result = await mcp_client.call_tool("status", {})
+        assert result is not None
 
-            async with Client(mcp) as client:
-                result = await client.call_tool("status", {})
-
-                assert result is not None
-        except ImportError:
-            pytest.skip("fastmcp not installed")
+    @pytest.mark.asyncio
+    async def test_client_can_call_get_artifact_not_found(self, mcp_client):
+        """get_artifact returns error for unknown ID."""
+        # Tool should handle error gracefully
+        with pytest.raises(Exception, match="not found"):
+            await mcp_client.call_tool(
+                "get_artifact", {"artifact_id": "nonexistent-id-12345"}
+            )
