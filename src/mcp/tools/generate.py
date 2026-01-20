@@ -125,8 +125,8 @@ def generate_layout(
                 "attempts": output.stats.attempts,
                 "tokens": output.stats.total_tokens,
                 "model": output.stats.final_model,
-                "rag_used": rag_available and len(output.prompt_context.examples) > 0,
-                "rag_examples": len(output.prompt_context.examples),
+                "rag_used": rag_available and output.prompt_context.example_count > 0,
+                "rag_examples": output.prompt_context.example_count,
             },
         }
 
