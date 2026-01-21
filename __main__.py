@@ -2096,7 +2096,6 @@ def handle_dev_command(argv: list[str]) -> int:
         python . dev test [args]       # Run pytest
         python . dev stats [provider]  # Corpus data profiling
         python . dev benchmark [args]  # Performance benchmarks
-        python . dev index [args]      # Build/manage indices
         python . dev corpus [args]     # Corpus data management
         python . dev demo [args]       # Render pipeline demo
     """
@@ -2107,7 +2106,6 @@ def handle_dev_command(argv: list[str]) -> int:
         print("  test       Run pytest with tier options")
         print("  stats      Corpus data profiling and statistics")
         print("  benchmark  Search quality and performance benchmarks")
-        print("  index      Build and manage vector indices")
         print("  corpus     Corpus data management (download, list)")
         print("  demo       Render pipeline demonstration")
         print("\nExamples:")
@@ -2115,7 +2113,6 @@ def handle_dev_command(argv: list[str]) -> int:
         print("  python . dev test --integration    # Integration tests")
         print("  python . dev stats rico_semantic   # Profile provider data")
         print("  python . dev benchmark -v          # Run benchmarks verbose")
-        print("  python . dev index build --all     # Build full index")
         print("  python . dev corpus download rico  # Download corpus")
         print("  python . dev demo login -r         # Render login demo")
         return 1
@@ -2127,7 +2124,6 @@ def handle_dev_command(argv: list[str]) -> int:
         "test": lambda: cmd_test(subargs),
         "stats": lambda: handle_stats_command(subargs),
         "benchmark": lambda: handle_benchmark_command(subargs),
-        "index": lambda: handle_index_command(subargs),
         "corpus": lambda: handle_corpus_command(subargs),
         "demo": lambda: handle_demo_command(subargs),
     }
