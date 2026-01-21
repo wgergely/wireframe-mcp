@@ -51,6 +51,7 @@ COPY pyproject.toml requirements.txt ./
 # CRITICAL: PyTorch MUST be installed with CUDA from PyTorch's index BEFORE sentence-transformers
 # This ensures GPU acceleration is available for embeddings and model inference
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu124 \
+    && pip install --no-cache-dir faiss-gpu-cu12 \
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir -e .
 

@@ -8,9 +8,9 @@ python-dotenv
 pydantic
 
 # Vector Database & Math
-# FAISS GPU: Installed via conda (no Windows pip wheels available)
-# Setup: conda install -c conda-forge faiss-gpu (requires Python 3.12)
-# The venv-win environment is a conda env with faiss-gpu pre-installed
+# FAISS GPU: Installed in Docker via pip (faiss-gpu-cu12)
+# Windows native: Use faiss-cpu (no GPU wheels available)
+# Linux native: pip install faiss-gpu-cu12
 numpy
 
 # PyTorch with CUDA 12.4 support
