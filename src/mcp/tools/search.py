@@ -67,11 +67,11 @@ def search_layouts(
         formatted_results.append(
             {
                 "score": round(result.score, 4),
-                "text": result.text,
+                "text": result.serialized_text or "",
                 "metadata": {
-                    "id": result.item_id,
-                    "source": result.metadata.get("source", "unknown"),
-                    **{k: v for k, v in result.metadata.items() if k != "source"},
+                    "id": result.id,
+                    "source": result.source,
+                    "dataset": result.dataset,
                 },
             }
         )
