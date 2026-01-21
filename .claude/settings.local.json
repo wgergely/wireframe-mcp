@@ -61,7 +61,31 @@
       "Bash(grep:*)",
       "mcp__plugin_context7_context7__resolve-library-id",
       "WebFetch(domain:gofastmcp.com)",
-      "mcp__plugin_context7_context7__query-docs"
+      "mcp__plugin_context7_context7__query-docs",
+      "Skill(superpowers:requesting-code-review)",
+      "Skill(superpowers:requesting-code-review:*)",
+      "Bash(pytest:*)",
+      "Bash(python -m pytest:*)",
+      "Skill(superpowers:systematic-debugging)",
+      "Skill(superpowers:systematic-debugging:*)",
+      "Bash(pip show:*)",
+      "Bash(python -c:*)",
+      "Bash(python . --help:*)",
+      "Bash(python . dev:*)",
+      "Bash(pip install:*)",
+      "Bash(python -m pip install:*)",
+      "Bash(python . service status:*)",
+      "Bash(python .:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:brainstorming:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(ls:*)",
+      "Bash(dir /s /b Y:code*.env)",
+      "Bash(powershell:*)"
     ]
   }
 }
