@@ -78,6 +78,7 @@ def run_in_container(
     gpu: bool = False,
     volumes: dict[str, str] | None = None,
     env: dict[str, str] | None = None,
+    workdir: str = "/app",
     capture_output: bool = False,
 ) -> subprocess.CompletedProcess:
     """Run a command inside a Docker container.
@@ -89,6 +90,7 @@ def run_in_container(
         gpu: Enable GPU.
         volumes: Volume mounts.
         env: Environment variables.
+        workdir: Working directory inside container.
         capture_output: Capture stdout/stderr.
 
     Returns:
@@ -101,6 +103,7 @@ def run_in_container(
         gpu=gpu,
         volumes=volumes,
         env=env,
+        workdir=workdir,
     )
 
     return subprocess.run(

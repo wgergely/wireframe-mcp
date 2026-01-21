@@ -1,8 +1,10 @@
 """Tests for Docker container execution."""
 
+from unittest.mock import patch
+
 import pytest
 
-from src.docker.exec import build_docker_exec_command
+from src.docker.exec import build_docker_exec_command, run_in_container
 
 
 class TestBuildDockerExecCommand:
@@ -105,3 +107,62 @@ class TestBuildDockerExecCommand:
             image="wireframe-mcp:latest",
         )
         assert "--rm" in cmd
+
+
+class TestRunInContainer:
+    """Tests for run_in_container function."""
+
+    @patch("src.docker.exec.subprocess.run")
+    def test_run_in_container_with_image(self, mock_run):
+        """Test run_in_container builds correct command and calls subprocess."""
+        mock_run.return_value.returncode = 0
+
+        run_in_container(
+            command=["python", ".", "index", "build"],
+            image="wireframe-mcp:latest",
+            capture_output=True,
+        )
+
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        docker_cmd = call_args[0][0]
+
+        assert docker_cmd[0:3] == ["docker", "run", "--rm"]
+        assert "-w" in docker_cmd
+        assert "/app" in docker_cmd
+        assert "wireframe-mcp:latest" in docker_cmd
+        assert call_args[1]["capture_output"] is True
+        assert call_args[1]["text"] is True
+
+    @patch("src.docker.exec.subprocess.run")
+    def test_run_in_container_with_custom_workdir(self, mock_run):
+        """Test run_in_container passes custom workdir to docker command."""
+        mock_run.return_value.returncode = 0
+
+        run_in_container(
+            command=["echo", "hello"],
+            image="wireframe-mcp:latest",
+            workdir="/custom/workdir",
+        )
+
+        mock_run.assert_called_once()
+        docker_cmd = mock_run.call_args[0][0]
+
+        assert "-w" in docker_cmd
+        assert "/custom/workdir" in docker_cmd
+
+    @patch("src.docker.exec.subprocess.run")
+    def test_run_in_container_with_container(self, mock_run):
+        """Test run_in_container with existing container (exec mode)."""
+        mock_run.return_value.returncode = 0
+
+        run_in_container(
+            command=["echo", "hello"],
+            container="wfmcp-server",
+        )
+
+        mock_run.assert_called_once()
+        docker_cmd = mock_run.call_args[0][0]
+
+        assert docker_cmd[0:2] == ["docker", "exec"]
+        assert "wfmcp-server" in docker_cmd
