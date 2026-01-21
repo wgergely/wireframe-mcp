@@ -1,11 +1,13 @@
 # Kroki rendering services
 #
-# This defines the Kroki gateway and all companion renderers:
-#   - wfmcp-kroki: Gateway service that routes to specialized renderers
-#   - wfmcp-kroki-d2: D2 diagram renderer
-#   - wfmcp-kroki-mermaid: Mermaid diagram renderer
-#   - wfmcp-kroki-bpmn: BPMN diagram renderer
-#   - wfmcp-kroki-excalidraw: Excalidraw whiteboard renderer
+# This defines the Kroki gateway and optional companion renderers:
+#   - wfmcp-kroki: Gateway service with built-in D2, PlantUML, GraphViz, etc.
+#   - wfmcp-kroki-mermaid: Mermaid diagram renderer (optional)
+#   - wfmcp-kroki-bpmn: BPMN diagram renderer (optional)
+#   - wfmcp-kroki-excalidraw: Excalidraw whiteboard renderer (optional)
+#
+# Note: D2 is now built into the main yuzutech/kroki image (as of 2024).
+# The separate yuzutech/kroki-d2 image no longer exists.
 #
 # Port Configuration (override via environment):
 #   KROKI_PORT - External port for Kroki API (default: 18000)
@@ -14,7 +16,6 @@
 #   - mermaid: 8002
 #   - bpmn: 8003
 #   - excalidraw: 8004
-#   - d2: 8012
 #
 # Usage:
 #   docker compose -f compose.base.yml -f compose.renderer.yml up
@@ -26,6 +27,7 @@ services:
   # Port 18000 chosen to avoid conflicts with common services:
   #   - 8000: Django, FastAPI, Python HTTP servers
   #   - 8080: Tomcat, Spring Boot, Jenkins
+  # D2 is built-in (no separate container needed)
   # -------------------------------------------------------------------------
   wfmcp-kroki:
     image: yuzutech/kroki
@@ -38,13 +40,11 @@ services:
     environment:
       - KROKI_SAFE_MODE=unsafe
       - KROKI_MAX_URI_LENGTH=8192
-      # Connect to companion renderers via hostname
+      # Connect to companion renderers via hostname (D2 is built-in)
       - KROKI_MERMAID_HOST=mermaid
       - KROKI_BPMN_HOST=bpmn
       - KROKI_EXCALIDRAW_HOST=excalidraw
-      - KROKI_D2_HOST=d2
     depends_on:
-      - wfmcp-kroki-d2
       - wfmcp-kroki-mermaid
       - wfmcp-kroki-bpmn
       - wfmcp-kroki-excalidraw
@@ -58,17 +58,8 @@ services:
 
   # -------------------------------------------------------------------------
   # Kroki companion renderers (internal only, not exposed)
+  # Note: D2 is now built into the main kroki image, no separate container
   # -------------------------------------------------------------------------
-  wfmcp-kroki-d2:
-    image: yuzutech/kroki-d2
-    container_name: wfmcp-kroki-d2
-    hostname: d2
-    networks:
-      - wfmcp-network
-    expose:
-      - "8012"
-    restart: unless-stopped
-
   wfmcp-kroki-mermaid:
     image: yuzutech/kroki-mermaid
     container_name: wfmcp-kroki-mermaid
