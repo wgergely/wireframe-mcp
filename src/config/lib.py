@@ -426,12 +426,16 @@ def get_index_dir(override: Path | str | None = None) -> Path:
 
 
 def get_available_llm_providers() -> list[str]:
-    """Get list of LLM providers with configured API keys.
+    """Get list of available LLM providers.
+
+    Checks both cloud providers (by API key) and local providers (by availability).
 
     Returns:
-        List of provider names (e.g., ["openai", "anthropic"]).
+        List of provider names (e.g., ["openai", "ollama"]).
     """
     providers = []
+
+    # Cloud providers - check for API keys
     if get_environment(EnvVar.OPENAI_API_KEY):
         providers.append("openai")
     if get_environment(EnvVar.ANTHROPIC_API_KEY):
@@ -440,6 +444,19 @@ def get_available_llm_providers() -> list[str]:
         providers.append("deepseek")
     if get_environment(EnvVar.QWEN_API_KEY):
         providers.append("qwen")
+
+    # Local providers - check if running
+    ollama_url = get_environment(EnvVar.OLLAMA_HOST)
+    if ollama_url:
+        try:
+            import httpx
+
+            response = httpx.get(f"{ollama_url}/api/tags", timeout=2.0)
+            if response.status_code == 200:
+                providers.append("ollama")
+        except Exception:
+            pass  # Ollama not running
+
     return providers
 
 

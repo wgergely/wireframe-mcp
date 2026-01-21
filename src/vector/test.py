@@ -830,17 +830,17 @@ class TestVectorStoreIntegration:
         store = self.VectorStore(backend=mock_backend)
         store.index_corpus(mock_provider, batch_size=10, workers=2)
 
-        # Save
-        save_path = tmp_path / "test_store"
-        store.save(save_path)
+        # Save (path is treated as a directory)
+        save_dir = tmp_path / "test_store"
+        store.save(save_dir)
 
-        # Verify files created
-        assert (tmp_path / "test_store.faiss").exists()
-        assert (tmp_path / "test_store.meta.json").exists()
-        assert (tmp_path / "test_store.store.json").exists()
+        # Verify files created inside directory
+        assert (save_dir / "index.faiss").exists()
+        assert (save_dir / "index.meta.json").exists()
+        assert (save_dir / "index.store.json").exists()
 
         # Load into new store
-        store2 = self.VectorStore(backend=mock_backend, index_path=save_path)
+        store2 = self.VectorStore(backend=mock_backend, index_path=save_dir)
 
         stats = store2.stats()
         assert stats.total_items == 3

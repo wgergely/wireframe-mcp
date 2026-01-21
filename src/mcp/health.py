@@ -129,12 +129,24 @@ def check_rag_index() -> ServiceStatus:
                 details={"path": str(index_dir)},
             )
 
-        # Check index size
-        from src.vector import VectorStore
+        # Check index size by reading metadata directly
+        # (Avoids initializing embedding backend which may require API keys)
+        import json
 
-        store = VectorStore()
-        store.load(index_dir)
-        item_count = len(store)
+        store_meta_path = index_dir / "index.store.json"
+        if store_meta_path.exists():
+            with open(store_meta_path) as f:
+                store_data = json.load(f)
+                item_count = len(store_data.get("metadata", {}))
+        else:
+            # Fallback to FAISS metadata
+            faiss_meta_path = index_dir / "index.meta.json"
+            if faiss_meta_path.exists():
+                with open(faiss_meta_path) as f:
+                    faiss_data = json.load(f)
+                    item_count = faiss_data.get("size", 0)
+            else:
+                item_count = 0
 
         return ServiceStatus(
             available=True,

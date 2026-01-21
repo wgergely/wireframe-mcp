@@ -1865,15 +1865,21 @@ def cmd_service_status(_args: list[str]) -> int:
     index_dir = get_index_dir()
     index_file = index_dir / "index.faiss"
     if index_file.exists():
-        from src.vector import VectorStore
+        import json
 
+        # Read metadata directly to avoid backend initialization issues
         try:
-            store = VectorStore()
-            store.load(index_dir)
-            stats = store.stats()
-            print(f"  [OK] {stats.total_items} documents indexed")
+            store_meta_path = index_dir / "index.store.json"
+            if store_meta_path.exists():
+                with open(store_meta_path) as f:
+                    store_data = json.load(f)
+                    item_count = len(store_data.get("metadata", {}))
+                    backend = store_data.get("backend", "unknown")
+                print(f"  [OK] {item_count} documents indexed (backend: {backend})")
+            else:
+                print(f"  [WARN] Index metadata not found at {store_meta_path}")
         except Exception as e:
-            print(f"  [WARN] Index exists but failed to load: {e}")
+            print(f"  [WARN] Index exists but failed to read: {e}")
     else:
         print(f"  [WARN] No index found at {index_dir}")
         print("  Run 'python . service init' to build index")

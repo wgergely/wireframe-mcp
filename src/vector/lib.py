@@ -129,7 +129,7 @@ class VectorStore:
         self._enable_cache = enable_embedding_cache
         self._embedding_cache: dict[str, np.ndarray] = {}
 
-        if index_path and Path(index_path).with_suffix(".faiss").exists():
+        if index_path and (Path(index_path) / "index.faiss").exists():
             self.load(index_path)
         else:
             self._index = FAISSIndex(dimension=self._backend.dimension)
@@ -460,7 +460,7 @@ class VectorStore:
         """Save index and metadata to disk.
 
         Args:
-            path: Save path (uses constructor path if None).
+            path: Directory to save index files (uses constructor path if None).
 
         Raises:
             ValueError: If no path available.
@@ -470,13 +470,13 @@ class VectorStore:
             raise ValueError("No save path specified")
 
         path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
 
-        # Save FAISS index
+        # Save FAISS index (saves to path/index.faiss and path/index.meta.json)
         self._index.save(path)
 
-        # Save metadata
-        meta_path = path.with_suffix(".store.json")
+        # Save VectorStore metadata
+        meta_path = path / "index.store.json"
         with open(meta_path, "w") as f:
             json.dump(
                 {
@@ -493,7 +493,7 @@ class VectorStore:
         """Load index and metadata from disk.
 
         Args:
-            path: Load path.
+            path: Directory containing index files.
 
         Raises:
             FileNotFoundError: If files not found.
@@ -501,7 +501,7 @@ class VectorStore:
         path = Path(path)
 
         # Load metadata first to get backend type
-        meta_path = path.with_suffix(".store.json")
+        meta_path = path / "index.store.json"
         if meta_path.exists():
             with open(meta_path) as f:
                 data = json.load(f)

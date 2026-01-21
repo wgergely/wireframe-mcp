@@ -277,17 +277,20 @@ class FAISSIndex:
     def save(self, path: Path) -> None:
         """Save index to disk.
 
-        Creates two files:
-        - {path}.faiss: The FAISS index
-        - {path}.meta.json: ID mapping and metadata
+        Creates two files in the directory:
+        - {path}/index.faiss: The FAISS index
+        - {path}/index.meta.json: ID mapping and metadata
 
         Args:
-            path: Base path for save files (without extension).
+            path: Directory to save index files.
         """
         import faiss
 
         path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
+
+        # Use 'index' as the base filename within the directory
+        base_path = path / "index"
 
         # Convert GPU index to CPU for saving
         if self._is_gpu:
@@ -296,7 +299,7 @@ class FAISSIndex:
             cpu_index = self._index
 
         # Save FAISS index
-        faiss.write_index(cpu_index, str(path.with_suffix(".faiss")))
+        faiss.write_index(cpu_index, str(base_path.with_suffix(".faiss")))
 
         # Save metadata
         meta = {
@@ -305,7 +308,7 @@ class FAISSIndex:
             "is_gpu": self._is_gpu,
             "id_map": self._id_map,
         }
-        with open(path.with_suffix(".meta.json"), "w") as f:
+        with open(base_path.with_suffix(".meta.json"), "w") as f:
             json.dump(meta, f)
 
         logger.info(f"Saved index to {path} ({self.size} vectors)")
@@ -315,7 +318,7 @@ class FAISSIndex:
         """Load index from disk.
 
         Args:
-            path: Base path for load files (without extension).
+            path: Directory containing index files.
             use_gpu: Force GPU (True), CPU (False), or auto-detect (None).
 
         Returns:
@@ -328,8 +331,11 @@ class FAISSIndex:
 
         path = Path(path)
 
+        # Use 'index' as the base filename within the directory
+        base_path = path / "index"
+
         # Load metadata
-        meta_path = path.with_suffix(".meta.json")
+        meta_path = base_path.with_suffix(".meta.json")
         if not meta_path.exists():
             raise FileNotFoundError(f"Index metadata not found: {meta_path}")
 
@@ -337,7 +343,7 @@ class FAISSIndex:
             meta = json.load(f)
 
         # Load FAISS index
-        faiss_path = path.with_suffix(".faiss")
+        faiss_path = base_path.with_suffix(".faiss")
         if not faiss_path.exists():
             raise FileNotFoundError(f"FAISS index not found: {faiss_path}")
 
