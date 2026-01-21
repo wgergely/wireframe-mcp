@@ -2264,6 +2264,8 @@ def show_help() -> None:
     print("  search     Search vector indices for similar layouts")
     print("  service    Manage MCP services (init, start, stop, status)")
     print("  docker     Manage Docker stack (up, down, ps, build)")
+    print("\n=== Index Management ===")
+    print("  index      Build and manage RAG vector indices")
     print("\n=== Development ===")
     print("  dev        Development workflows (test, benchmark, etc.)")
     print("\nGetting Started:")
@@ -2282,11 +2284,14 @@ def show_help() -> None:
     print("  python . service start              # Start services")
     print("  python . service stop               # Stop services")
     print("  python . docker ps                  # Check Docker services")
+    print("\nIndex Management:")
+    print("  python . index build --all          # Build RAG index from all providers")
+    print("  python . index build rico_semantic  # Build index from specific provider")
+    print("  python . index info .corpus/index   # Show index information")
     print("\nDevelopment Examples:")
     print("  python . dev test --unit             # Run unit tests")
     print("  python . dev stats                   # Profile corpus data")
     print("  python . dev benchmark -v            # Run benchmarks")
-    print("  python . dev index build --all       # Build RAG index")
     print("  python . dev corpus download rico    # Download corpus data")
     print("  python . dev demo dashboard          # Demo render pipeline")
     print("\nFor dev command details: python . dev")
@@ -2312,6 +2317,7 @@ def main() -> int:
         "search": lambda: handle_search_command(rest_args),
         "service": lambda: cmd_service(rest_args),
         "docker": lambda: handle_docker_command(rest_args),
+        "index": lambda: handle_index_command(rest_args),
     }
 
     # Development commands (nested under 'dev')
