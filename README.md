@@ -165,6 +165,29 @@ Offers a sketchy, wireframe aesthetic with high tolerance for LLM output variati
 | Agentic Mode | Planned | Server-side LLM orchestration |
 
 
+## GPU-Accelerated Index Build
+
+For optimal performance when building the RAG index, use GPU acceleration via Docker:
+
+```bash
+# One-time setup: build Docker image
+python . docker build
+
+# Full index build (GPU-accelerated)
+python . index build --all --docker
+
+# Or use convenience script
+./scripts/build-full-index.sh
+
+# Test with limited documents first
+./scripts/build-full-index.sh --limit 1000
+```
+
+**Requirements:**
+- NVIDIA GPU with CUDA 12+
+- Docker with NVIDIA runtime ([installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html))
+- ~10GB disk space for full corpus
+
 ## Future: RAG-Enhanced Layout Generation
 
 The system is designed to integrate Retrieval-Augmented Generation (RAG) for improved layout suggestions:
