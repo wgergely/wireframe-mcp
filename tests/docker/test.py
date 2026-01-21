@@ -166,3 +166,186 @@ class TestRunInContainer:
 
         assert docker_cmd[0:2] == ["docker", "exec"]
         assert "wfmcp-server" in docker_cmd
+
+
+@pytest.mark.unit
+class TestIndexBuildDockerFlag:
+    """Tests for index build --docker flag CLI integration."""
+
+    def test_docker_argument_parsed(self):
+        """Test --docker argument is correctly parsed by argparse."""
+        import argparse
+        from pathlib import Path
+
+        # Simulate the parser setup from handle_index_command
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+        build_parser = subparsers.add_parser("build")
+        build_parser.add_argument("provider", nargs="?", default=None)
+        build_parser.add_argument("--all", "-a", action="store_true")
+        build_parser.add_argument("--output", "-o", type=Path, default=None)
+        build_parser.add_argument("--backend", "-b", type=str, default=None)
+        build_parser.add_argument("--batch-size", type=int, default=100)
+        build_parser.add_argument("--limit", type=int, default=None)
+        build_parser.add_argument("--skip-download", action="store_true")
+        build_parser.add_argument("--docker", action="store_true")
+        build_parser.add_argument("--image", type=str, default="wireframe-mcp:latest")
+
+        args = parser.parse_args(["build", "rico_semantic", "--docker"])
+        assert args.docker is True
+        assert args.provider == "rico_semantic"
+        assert args.image == "wireframe-mcp:latest"
+
+    def test_image_argument_with_custom_value(self):
+        """Test --image argument accepts custom values."""
+        import argparse
+        from pathlib import Path
+
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+        build_parser = subparsers.add_parser("build")
+        build_parser.add_argument("provider", nargs="?", default=None)
+        build_parser.add_argument("--all", "-a", action="store_true")
+        build_parser.add_argument("--output", "-o", type=Path, default=None)
+        build_parser.add_argument("--backend", "-b", type=str, default=None)
+        build_parser.add_argument("--batch-size", type=int, default=100)
+        build_parser.add_argument("--limit", type=int, default=None)
+        build_parser.add_argument("--skip-download", action="store_true")
+        build_parser.add_argument("--docker", action="store_true")
+        build_parser.add_argument("--image", type=str, default="wireframe-mcp:latest")
+
+        args = parser.parse_args(["build", "--all", "--docker", "--image", "custom:v1"])
+        assert args.docker is True
+        assert args.all is True
+        assert args.image == "custom:v1"
+
+    def test_docker_flag_builds_correct_inner_command(self):
+        """Test that docker mode builds inner command correctly."""
+        import argparse
+
+        # Create a minimal args object
+        args = argparse.Namespace(
+            docker=True,
+            image="wireframe-mcp:latest",
+            all=False,
+            provider="rico_semantic",
+            backend="local",
+            batch_size=100,
+            limit=50,
+            output=None,
+            skip_download=False,
+        )
+
+        # Build inner command like cmd_build_index does
+        inner_cmd = ["python", ".", "index", "build"]
+        if args.all:
+            inner_cmd.append("--all")
+        elif args.provider:
+            inner_cmd.append(args.provider)
+        if args.backend:
+            inner_cmd.extend(["--backend", args.backend])
+        if args.batch_size:
+            inner_cmd.extend(["--batch-size", str(args.batch_size)])
+        if args.limit:
+            inner_cmd.extend(["--limit", str(args.limit)])
+        if args.output:
+            inner_cmd.extend(["--output", str(args.output)])
+        if args.skip_download:
+            inner_cmd.append("--skip-download")
+
+        expected = [
+            "python",
+            ".",
+            "index",
+            "build",
+            "rico_semantic",
+            "--backend",
+            "local",
+            "--batch-size",
+            "100",
+            "--limit",
+            "50",
+        ]
+        assert inner_cmd == expected
+
+    def test_docker_flag_with_all_providers(self):
+        """Test that --all flag is passed correctly in docker mode."""
+        import argparse
+
+        args = argparse.Namespace(
+            docker=True,
+            image="wireframe-mcp:latest",
+            all=True,
+            provider=None,
+            backend=None,
+            batch_size=100,
+            limit=None,
+            output=None,
+            skip_download=True,
+        )
+
+        inner_cmd = ["python", ".", "index", "build"]
+        if args.all:
+            inner_cmd.append("--all")
+        elif args.provider:
+            inner_cmd.append(args.provider)
+        if args.backend:
+            inner_cmd.extend(["--backend", args.backend])
+        if args.batch_size:
+            inner_cmd.extend(["--batch-size", str(args.batch_size)])
+        if args.limit:
+            inner_cmd.extend(["--limit", str(args.limit)])
+        if args.output:
+            inner_cmd.extend(["--output", str(args.output)])
+        if args.skip_download:
+            inner_cmd.append("--skip-download")
+
+        expected = [
+            "python",
+            ".",
+            "index",
+            "build",
+            "--all",
+            "--batch-size",
+            "100",
+            "--skip-download",
+        ]
+        assert inner_cmd == expected
+
+    @patch("src.docker.exec.subprocess.run")
+    def test_docker_run_called_with_gpu(self, mock_run):
+        """Test that docker run is called with GPU flag."""
+        mock_run.return_value.returncode = 0
+
+        run_in_container(
+            command=["python", ".", "index", "build", "rico_semantic"],
+            image="wireframe-mcp:latest",
+            gpu=True,
+            volumes={
+                "/host/data": "/app/corpus/data",
+                "/host/corpus": "/app/corpus",
+            },
+            env={"EMBEDDING_BACKEND": "local"},
+        )
+
+        mock_run.assert_called_once()
+        docker_cmd = mock_run.call_args[0][0]
+
+        # Verify GPU flag
+        assert "--gpus" in docker_cmd
+        assert "all" in docker_cmd
+
+        # Verify volumes
+        assert "-v" in docker_cmd
+        assert "/host/data:/app/corpus/data" in docker_cmd
+        assert "/host/corpus:/app/corpus" in docker_cmd
+
+        # Verify env
+        assert "-e" in docker_cmd
+        assert "EMBEDDING_BACKEND=local" in docker_cmd
+
+        # Verify command
+        assert "python" in docker_cmd
+        assert "index" in docker_cmd
+        assert "build" in docker_cmd
+        assert "rico_semantic" in docker_cmd

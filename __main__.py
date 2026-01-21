@@ -336,6 +336,48 @@ def _build_index_for_provider(
 
 def cmd_build_index(args: argparse.Namespace) -> int:
     """Handle the build index command."""
+
+    # If --docker flag, re-execute inside container
+    if getattr(args, "docker", False):
+        from src.config import get_data_dir, get_index_dir
+        from src.docker.exec import run_in_container
+
+        # Build the command without --docker to avoid recursion
+        inner_cmd = ["python", ".", "index", "build"]
+        if args.all:
+            inner_cmd.append("--all")
+        elif args.provider:
+            inner_cmd.append(args.provider)
+        if args.backend:
+            inner_cmd.extend(["--backend", args.backend])
+        if args.batch_size:
+            inner_cmd.extend(["--batch-size", str(args.batch_size)])
+        if args.limit:
+            inner_cmd.extend(["--limit", str(args.limit)])
+        if args.output:
+            inner_cmd.extend(["--output", str(args.output)])
+        if args.skip_download:
+            inner_cmd.append("--skip-download")
+
+        # Mount corpus directories
+        host_data = str(get_data_dir())
+        host_index = str(get_index_dir().parent)  # Mount parent .corpus dir
+
+        logger.info(f"Executing in Docker container: {args.image}")
+        logger.info(f"Command: {' '.join(inner_cmd)}")
+
+        result = run_in_container(
+            command=inner_cmd,
+            image=args.image,
+            gpu=True,
+            volumes={
+                host_data: "/app/corpus/data",
+                host_index: "/app/corpus",
+            },
+            env={"EMBEDDING_BACKEND": args.backend or "local"},
+        )
+        return result.returncode
+
     from src.config import get_default_embedding_backend, get_index_dir
     from src.vector import BackendType, VectorStore
 
@@ -558,6 +600,17 @@ def handle_index_command(argv: list[str]) -> int:
         "--skip-download",
         action="store_true",
         help="Skip providers that need downloading (use existing data only)",
+    )
+    build_parser.add_argument(
+        "--docker",
+        action="store_true",
+        help="Execute inside Docker container with GPU support",
+    )
+    build_parser.add_argument(
+        "--image",
+        type=str,
+        default="wireframe-mcp:latest",
+        help="Docker image to use (default: wireframe-mcp:latest)",
     )
     build_parser.set_defaults(func=cmd_build_index)
 
