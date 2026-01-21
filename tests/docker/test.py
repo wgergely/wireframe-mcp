@@ -7,6 +7,7 @@ import pytest
 from src.docker.exec import build_docker_exec_command, run_in_container
 
 
+@pytest.mark.unit
 class TestBuildDockerExecCommand:
     """Tests for build_docker_exec_command function."""
 
@@ -109,6 +110,7 @@ class TestBuildDockerExecCommand:
         assert "--rm" in cmd
 
 
+@pytest.mark.unit
 class TestRunInContainer:
     """Tests for run_in_container function."""
 
