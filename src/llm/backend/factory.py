@@ -5,7 +5,6 @@ Provides a unified entry point for creating any supported LLM backend.
 
 from .base import LLMBackend
 from .model_spec import (
-    DEFAULT_MODEL,
     LLMModel,
     LLMProviderType,
     LLMSpec,
@@ -14,7 +13,7 @@ from .model_spec import (
 
 
 def create_llm_backend(
-    model: str | LLMModel | LLMSpec = DEFAULT_MODEL,
+    model: str | LLMModel | LLMSpec | None = None,
     *,
     api_key: str | None = None,
     base_url: str | None = None,
@@ -28,9 +27,13 @@ def create_llm_backend(
 
     Args:
         model: Model to use. Can be:
+            - None (auto-selects based on available providers)
             - String model name (e.g., "gpt-4.1-mini", "claude-sonnet-4-5")
             - LLMModel enum value (e.g., LLMModel.GPT_4_1_MINI)
             - LLMSpec instance
+            When None, uses get_default_llm_model() which follows this
+            fallback chain: OpenAI > Anthropic > DeepSeek > Qwen > Ollama.
+            User can override with LLM_PROVIDER env var.
         api_key: API key for remote providers. Falls back to environment
             variable if not provided.
         base_url: Optional custom API endpoint. Uses provider default if None.
@@ -61,6 +64,12 @@ def create_llm_backend(
         ...     timeout=120.0,
         ... )
     """
+    # Use dynamic default if no model specified
+    if model is None:
+        from src.config import get_default_llm_model
+
+        model = get_default_llm_model()
+
     spec = get_llm_spec(model)
 
     if spec.provider == LLMProviderType.OPENAI:

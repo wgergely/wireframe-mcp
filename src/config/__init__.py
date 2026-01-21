@@ -34,6 +34,8 @@ from .lib import (
     get_available_llm_providers,
     get_corpus_path,
     get_data_dir,
+    get_default_embedding_backend,
+    get_default_llm_model,
     get_docker_ports,
     get_environment,
     get_environment_info,
@@ -58,6 +60,8 @@ __all__ = [
     "get_models_dir",
     "get_index_dir",
     "get_available_llm_providers",
+    "get_default_llm_model",
+    "get_default_embedding_backend",
     "get_docker_ports",
     # Introspection
     "list_environment_variables",

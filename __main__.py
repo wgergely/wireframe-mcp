@@ -336,15 +336,16 @@ def _build_index_for_provider(
 
 def cmd_build_index(args: argparse.Namespace) -> int:
     """Handle the build index command."""
-    from src.config import get_index_dir
+    from src.config import get_default_embedding_backend, get_index_dir
     from src.vector import BackendType, VectorStore
 
     try:
         # Resolve output path
         output_path = args.output if args.output else get_index_dir()
 
-        # Determine backend
-        backend_type = BackendType[args.backend.upper()]
+        # Determine backend (auto-select if not specified)
+        backend_name = args.backend or get_default_embedding_backend()
+        backend_type = BackendType[backend_name.upper()]
 
         logger.info("")
         logger.info("=" * 60)
@@ -537,9 +538,9 @@ def handle_index_command(argv: list[str]) -> int:
         "--backend",
         "-b",
         type=str,
-        default="voyage",
+        default=None,
         choices=["voyage", "local"],
-        help="Embedding backend (default: voyage)",
+        help="Embedding backend (default: auto-select based on VOYAGE_API_KEY)",
     )
     build_parser.add_argument(
         "--batch-size",

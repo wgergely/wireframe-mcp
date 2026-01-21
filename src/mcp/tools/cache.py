@@ -20,8 +20,9 @@ def get_vector_store():
     Note:
         The cache persists for the lifetime of the server process.
         If the index is rebuilt, the server should be restarted.
+        Backend is auto-selected based on get_default_embedding_backend().
     """
-    from src.config import get_index_dir
+    from src.config import get_default_embedding_backend, get_index_dir
     from src.vector import VectorStore
 
     index_dir = get_index_dir()
@@ -32,9 +33,11 @@ def get_vector_store():
         return None
 
     try:
-        store = VectorStore()
+        # Auto-select backend based on configuration
+        backend = get_default_embedding_backend()
+        store = VectorStore(backend=backend)
         store.load(index_dir)
-        logger.info(f"Loaded vector index with {len(store)} items")
+        logger.info(f"Loaded vector index with {len(store)} items (backend: {backend})")
         return store
     except Exception as e:
         logger.warning(f"Failed to load vector index: {e}")

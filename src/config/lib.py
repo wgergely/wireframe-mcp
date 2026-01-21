@@ -460,6 +460,82 @@ def get_available_llm_providers() -> list[str]:
     return providers
 
 
+def get_default_llm_model() -> str:
+    """Get the default LLM model based on available providers.
+
+    Uses a two-tier fallback system:
+    1. Primary: Cloud providers (OpenAI > Anthropic > DeepSeek > Qwen)
+    2. Fallback: Local Ollama models
+
+    User can override with LLM_PROVIDER env var to prefer a specific provider.
+
+    The fallback chain is:
+    - gpt-4.1-mini (OpenAI) - Best cost/performance for structured JSON output
+    - claude-sonnet-4-5 (Anthropic) - Best for coding and agents
+    - deepseek-chat (DeepSeek) - Cost-effective alternative
+    - qwen-turbo (Qwen) - Fast inference
+    - qwen3 (Ollama) - Local fallback
+
+    Returns:
+        Model name string suitable for create_llm_backend().
+    """
+    # Check for explicit provider override
+    preferred = get_environment(EnvVar.LLM_PROVIDER)
+    available = get_available_llm_providers()
+
+    # Provider to default model mapping
+    provider_models = {
+        "openai": "gpt-4.1-mini",
+        "anthropic": "claude-sonnet-4-5",
+        "deepseek": "deepseek-chat",
+        "qwen": "qwen-turbo",
+        "ollama": "llama3.2",  # Default local model (widely available)
+    }
+
+    # If user specified a preference and it's available, use it
+    if preferred and preferred.lower() in available:
+        return provider_models.get(preferred.lower(), "gpt-4.1-mini")
+
+    # Cloud-first fallback chain
+    cloud_priority = ["openai", "anthropic", "deepseek", "qwen"]
+    for provider in cloud_priority:
+        if provider in available:
+            return provider_models[provider]
+
+    # Local fallback
+    if "ollama" in available:
+        return provider_models["ollama"]
+
+    # Nothing available - return default (will error at runtime)
+    return "gpt-4.1-mini"
+
+
+def get_default_embedding_backend() -> str:
+    """Get the default embedding backend based on configuration.
+
+    Auto-selects based on API key availability:
+    - If VOYAGE_API_KEY is set: use "voyage" (cloud, higher quality)
+    - Otherwise: use "local" (sentence-transformers, no API key needed)
+
+    User can override with EMBEDDING_BACKEND env var.
+
+    Returns:
+        Backend name string ("voyage" or "local").
+    """
+    import os
+
+    # Check for explicit override (must be set in environment, not default)
+    explicit = os.environ.get("EMBEDDING_BACKEND")
+    if explicit and explicit.lower() in ("voyage", "local"):
+        return explicit.lower()
+
+    # Auto-select based on API key availability
+    if get_environment(EnvVar.VOYAGE_API_KEY):
+        return "voyage"
+
+    return "local"
+
+
 def list_environment_variables(category: str | None = None) -> list[EnvVar]:
     """List all environment variables, optionally filtered by category.
 
@@ -502,6 +578,8 @@ __all__ = [
     "get_models_dir",
     "get_index_dir",
     "get_available_llm_providers",
+    "get_default_llm_model",
+    "get_default_embedding_backend",
     # Introspection
     "list_environment_variables",
     "get_docker_ports",
