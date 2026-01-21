@@ -1572,8 +1572,8 @@ def _parse_init_args(args: list[str]) -> dict:
     parser.add_argument(
         "--index-limit",
         type=int,
-        default=100,
-        help="Max items to index during init (default: 100)",
+        default=None,  # no limit by default
+        help="Max items to index (default: no limit for --docker, 500 for local)",
     )
     parser.add_argument(
         "--skip-docker",
@@ -1584,6 +1584,11 @@ def _parse_init_args(args: list[str]) -> dict:
         "--skip-corpus",
         action="store_true",
         help="Skip corpus download and indexing",
+    )
+    parser.add_argument(
+        "--docker",
+        action="store_true",
+        help="Use Docker container for GPU-accelerated indexing",
     )
     parser.add_argument(
         "--show-env",
@@ -1681,7 +1686,14 @@ def cmd_service_init(args: list[str]) -> int:
     print(f"  Embedding backend: {opts['embedding']}")
     print(f"  Kroki port: {opts['kroki_port']}")
     print(f"  Corpus: {opts['corpus']}")
-    print(f"  Index limit: {opts['index_limit']}")
+    print(f"  Docker indexing: {opts['docker']}")
+    # Show effective index limit
+    if opts["index_limit"] is not None:
+        print(f"  Index limit: {opts['index_limit']}")
+    elif opts["docker"]:
+        print("  Index limit: no limit (docker)")
+    else:
+        print("  Index limit: 500 (local default)")
     if opts["llm"]:
         print(f"  Preferred LLM: {opts['llm']}")
     print()
@@ -1798,7 +1810,7 @@ def cmd_service_init(args: list[str]) -> int:
         print("[5/6] Skipping index build (--skip-corpus)")
     else:
         print("[5/6] Checking RAG index...")
-        from src.config import get_index_dir
+        from src.config import get_data_dir, get_index_dir
 
         index_dir = get_index_dir()
         index_file = index_dir / "index.faiss"
@@ -1807,42 +1819,87 @@ def cmd_service_init(args: list[str]) -> int:
             print(f"  Index already exists at {index_dir}")
         else:
             embedding_backend = opts["embedding"]
-            print(f"  Building index with {embedding_backend} embeddings...")
-            try:
-                from src.vector import BackendType, VectorStore
 
-                backend_type = (
-                    BackendType.VOYAGE
-                    if embedding_backend == "voyage"
-                    else BackendType.LOCAL
-                )
+            # Docker indexing path
+            if opts["docker"]:
+                print("  Building index with Docker (GPU-accelerated)...")
+                try:
+                    from src.docker.exec import run_in_container
 
-                # Check Voyage API if selected
-                if backend_type == BackendType.VOYAGE:
-                    voyage_ok, voyage_msg = _check_voyage_api()
-                    if not voyage_ok:
-                        print(f"  WARNING: Voyage not available ({voyage_msg})")
-                        print("  Falling back to local embeddings")
-                        backend_type = BackendType.LOCAL
+                    # Build the command
+                    inner_cmd = ["python", ".", "index", "build", "--all"]
+                    if opts["index_limit"] is not None:
+                        inner_cmd.extend(["--limit", str(opts["index_limit"])])
+                    inner_cmd.extend(["--backend", embedding_backend])
 
-                store = VectorStore(backend=backend_type)
-                indexed = 0
+                    # Mount corpus volumes
+                    host_data = str(get_data_dir())
+                    host_index = str(index_dir.parent)  # Mount parent .corpus dir
 
-                manager = CorpusManager()
-                for item in manager.stream_data(opts["corpus"]):
-                    if item.layout is not None:
-                        store.index_item(item)
-                        indexed += 1
-                        if indexed >= opts["index_limit"]:
-                            break
+                    result = run_in_container(
+                        command=inner_cmd,
+                        image="wireframe-mcp:latest",
+                        gpu=True,
+                        volumes={
+                            host_data: "/app/corpus/data",
+                            host_index: "/app/corpus",
+                        },
+                        env={"EMBEDDING_BACKEND": embedding_backend},
+                    )
 
-                if indexed > 0:
-                    store.save(index_dir)
-                    print(f"  Indexed {indexed} items to {index_dir}")
-                else:
-                    print("  WARNING: No items to index")
-            except Exception as e:
-                print(f"  WARNING: Could not build index: {e}")
+                    if result.returncode == 0:
+                        print("  Docker indexing complete")
+                    else:
+                        print("  WARNING: Docker indexing failed")
+                        print("  Falling back to local indexing")
+                        opts["docker"] = False  # Fall through to local indexing
+                except Exception as e:
+                    print(f"  WARNING: Docker indexing failed ({e})")
+                    print("  Falling back to local indexing")
+                    opts["docker"] = False  # Fall through to local indexing
+
+            # Local indexing path (also used as fallback from docker)
+            if not opts["docker"]:
+                # Use sensible default limit of 500 for local if not specified
+                limit = opts["index_limit"]
+                index_limit = limit if limit is not None else 500
+
+                print(f"  Building index with {embedding_backend} embeddings...")
+                try:
+                    from src.vector import BackendType, VectorStore
+
+                    backend_type = (
+                        BackendType.VOYAGE
+                        if embedding_backend == "voyage"
+                        else BackendType.LOCAL
+                    )
+
+                    # Check Voyage API if selected
+                    if backend_type == BackendType.VOYAGE:
+                        voyage_ok, voyage_msg = _check_voyage_api()
+                        if not voyage_ok:
+                            print(f"  WARNING: Voyage not available ({voyage_msg})")
+                            print("  Falling back to local embeddings")
+                            backend_type = BackendType.LOCAL
+
+                    store = VectorStore(backend=backend_type)
+                    indexed = 0
+
+                    manager = CorpusManager()
+                    for item in manager.stream_data(opts["corpus"]):
+                        if item.layout is not None:
+                            store.index_item(item)
+                            indexed += 1
+                            if indexed >= index_limit:
+                                break
+
+                    if indexed > 0:
+                        store.save(index_dir)
+                        print(f"  Indexed {indexed} items to {index_dir}")
+                    else:
+                        print("  WARNING: No items to index")
+                except Exception as e:
+                    print(f"  WARNING: Could not build index: {e}")
     print()
 
     # Step 6: Verify optional services
