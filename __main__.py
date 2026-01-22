@@ -2362,6 +2362,92 @@ def handle_mcp_command(argv: list[str]) -> int:
         return handle_mcp_command([])
 
 
+# =============================================================================
+# Env Command (Environment Introspection)
+# =============================================================================
+
+
+def cmd_env_check(_args: argparse.Namespace) -> int:
+    """Check environment capabilities for GPU-dependent commands."""
+    from src.environment import check_environment
+
+    report = check_environment()
+    report.print_report()
+
+    # Return non-zero if environment can't run GPU commands
+    return 0 if report.can_run_gpu_commands else 1
+
+
+def _cmd_env_gpu() -> int:
+    """Quick GPU check."""
+    from src.environment import detect_gpu_capabilities
+
+    caps = detect_gpu_capabilities()
+    print(f"GPU: {caps.summary}")
+    print(f"  FAISS GPU: {'Yes' if caps.faiss_gpu_available else 'No'}")
+    print(f"  PyTorch CUDA: {'Yes' if caps.torch_cuda_available else 'No'}")
+    return 0 if caps.has_gpu else 1
+
+
+def _cmd_env_docker() -> int:
+    """Quick Docker check."""
+    from src.environment import detect_docker
+
+    docker = detect_docker()
+    print(f"Docker: {docker.summary}")
+    print(f"  Available: {'Yes' if docker.available else 'No'}")
+    print(f"  GPU Runtime: {'Yes' if docker.nvidia_runtime else 'No'}")
+    return 0 if docker.can_run_gpu else 1
+
+
+def handle_env_command(argv: list[str]) -> int:
+    """Handle environment inspection commands.
+
+    Usage:
+        python . env check    # Full environment report
+        python . env gpu      # GPU-only check
+        python . env docker   # Docker-only check
+    """
+    parser = argparse.ArgumentParser(
+        prog="python . env",
+        description="Environment inspection and validation",
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+
+    # check command
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Full environment capability check",
+    )
+    check_parser.set_defaults(func=cmd_env_check)
+
+    # gpu command (quick check)
+    gpu_parser = subparsers.add_parser(
+        "gpu",
+        help="GPU capability check only",
+    )
+    gpu_parser.set_defaults(func=lambda args: _cmd_env_gpu())
+
+    # docker command (quick check)
+    docker_parser = subparsers.add_parser(
+        "docker",
+        help="Docker availability check only",
+    )
+    docker_parser.set_defaults(func=lambda args: _cmd_env_docker())
+
+    if not argv:
+        # Default to full check
+        argv = ["check"]
+
+    args = parser.parse_args(argv)
+
+    if not args.command:
+        parser.print_help()
+        return 1
+
+    return args.func(args)
+
+
 def show_help() -> None:
     """Display CLI help message."""
     print("Usage: python . {command} [args]")
@@ -2374,6 +2460,8 @@ def show_help() -> None:
     print("  docker     Manage Docker stack (up, down, ps, build)")
     print("\n=== Index Management ===")
     print("  index      Build and manage RAG vector indices")
+    print("\n=== Environment ===")
+    print("  env        Check environment capabilities (GPU, Docker)")
     print("\n=== Development ===")
     print("  dev        Development workflows (test, benchmark, etc.)")
     print("\nGetting Started:")
@@ -2426,6 +2514,7 @@ def main() -> int:
         "service": lambda: cmd_service(rest_args),
         "docker": lambda: handle_docker_command(rest_args),
         "index": lambda: handle_index_command(rest_args),
+        "env": lambda: handle_env_command(rest_args),
     }
 
     # Development commands (nested under 'dev')
