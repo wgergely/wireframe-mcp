@@ -20,6 +20,7 @@ from .models import (
     ArtifactStatus,
     GenerationArtifact,
     GenerationStats,
+    Interaction,
     Session,
     StorageConfig,
     VariationRequest,
@@ -630,3 +631,51 @@ class TestVariationSets:
 
         artifacts = manager.get_variation_artifacts(variation_set.id)
         assert len(artifacts) == 3
+
+
+# =============================================================================
+# Interaction Model Tests
+# =============================================================================
+
+
+class TestInteractionModel:
+    """Tests for Interaction model."""
+
+    def test_interaction_creation_via_factory(self):
+        """Test Interaction model creation via factory."""
+        interaction = Interaction.create(
+            session_id="test-session",
+            tool_name="generate_layout",
+            request_params={"query": "login form", "temperature": 0.7},
+        )
+        assert interaction.id is not None
+        assert interaction.session_id == "test-session"
+        assert interaction.tool_name == "generate_layout"
+        assert interaction.request_params["query"] == "login form"
+        assert interaction.artifact_id is None
+        assert interaction.feedback is None
+        assert interaction.agent_id is None
+
+    def test_interaction_with_artifact_link(self):
+        """Test Interaction with artifact link."""
+        interaction = Interaction.create(
+            session_id="test-session",
+            tool_name="generate_layout",
+            request_params={"query": "dashboard"},
+            artifact_id="artifact-123",
+            response_summary={"status": "success", "node_count": 5},
+        )
+        assert interaction.artifact_id == "artifact-123"
+        assert interaction.response_summary["status"] == "success"
+
+    def test_interaction_with_feedback(self):
+        """Test Interaction for refine_layout with feedback."""
+        interaction = Interaction.create(
+            session_id="test-session",
+            tool_name="refine_layout",
+            request_params={"artifact_id": "parent-123"},
+            artifact_id="child-456",
+            feedback="make the sidebar narrower",
+        )
+        assert interaction.tool_name == "refine_layout"
+        assert interaction.feedback == "make the sidebar narrower"

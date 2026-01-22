@@ -342,10 +342,66 @@ class CleanupResult:
         return self.bytes_freed / (1024 * 1024)
 
 
+@dataclass
+class Interaction:
+    """A logged MCP tool interaction.
+
+    Captures every tool call for conversation reconstruction
+    and agent behavior auditing.
+
+    Attributes:
+        id: Unique interaction identifier.
+        session_id: Parent session.
+        artifact_id: Linked artifact (for generation tools).
+        tool_name: MCP tool that was called.
+        request_params: Input parameters as dict.
+        response_summary: Summary of response (not full response).
+        feedback: For refine_layout, the feedback string.
+        agent_id: Optional client/agent identifier.
+        created_at: Timestamp of the call.
+    """
+
+    id: str
+    session_id: str
+    tool_name: str
+    request_params: dict[str, Any]
+
+    artifact_id: str | None = None
+    response_summary: dict[str, Any] | None = None
+    feedback: str | None = None
+    agent_id: str | None = None
+
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    @classmethod
+    def create(
+        cls,
+        session_id: str,
+        tool_name: str,
+        request_params: dict[str, Any],
+        artifact_id: str | None = None,
+        response_summary: dict[str, Any] | None = None,
+        feedback: str | None = None,
+        agent_id: str | None = None,
+    ) -> "Interaction":
+        """Factory method to create a new interaction with generated ID."""
+        return cls(
+            id=str(uuid4()),
+            session_id=session_id,
+            tool_name=tool_name,
+            request_params=request_params,
+            artifact_id=artifact_id,
+            response_summary=response_summary,
+            feedback=feedback,
+            agent_id=agent_id,
+        )
+
+
 __all__ = [
     "ArtifactStatus",
     "GenerationStats",
     "GenerationArtifact",
+    "Interaction",
     "Session",
     "VariationRequest",
     "VariationSet",
