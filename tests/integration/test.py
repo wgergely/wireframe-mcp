@@ -37,8 +37,9 @@ def _has_wireframe_mcp_image() -> bool:
             return False
 
         # Verify the image can run Python (validates it's properly configured)
+        # Note: The image has ENTRYPOINT ["python"], so we pass args to python directly
         result = subprocess.run(
-            ["docker", "run", "--rm", "wireframe-mcp:latest", "python", "--version"],
+            ["docker", "run", "--rm", "wireframe-mcp:latest", "--version"],
             capture_output=True,
             text=True,
             timeout=30,

@@ -343,7 +343,8 @@ def cmd_build_index(args: argparse.Namespace) -> int:
         from src.docker.exec import run_in_container
 
         # Build the command without --docker to avoid recursion
-        inner_cmd = ["python", ".", "index", "build"]
+        # Note: Image has ENTRYPOINT ["python"], so we start with "." not "python ."
+        inner_cmd = [".", "index", "build"]
         if args.all:
             inner_cmd.append("--all")
         elif args.provider:
@@ -1827,7 +1828,8 @@ def cmd_service_init(args: list[str]) -> int:
                     from src.docker.exec import run_in_container
 
                     # Build the command
-                    inner_cmd = ["python", ".", "index", "build", "--all"]
+                    # Note: Image has ENTRYPOINT ["python"], so we start with "." not "python ."
+                    inner_cmd = [".", "index", "build", "--all"]
                     if opts["index_limit"] is not None:
                         inner_cmd.extend(["--limit", str(opts["index_limit"])])
                     inner_cmd.extend(["--backend", embedding_backend])
