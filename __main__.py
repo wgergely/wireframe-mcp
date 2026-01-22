@@ -2477,6 +2477,86 @@ def _cmd_env_docker(args: argparse.Namespace) -> int:
     return 0 if docker.can_run_gpu else 1
 
 
+# =============================================================================
+# Reset Command
+# =============================================================================
+
+
+def handle_reset_command(argv: list[str]) -> int:
+    """Handle environment reset commands.
+
+    Usage:
+        python . reset              # Default: clear RAG indices only
+        python . reset --all        # Full purge: indices + models + docker + temp
+        python . reset --index      # Clear RAG indices
+        python . reset --models     # Clear embedding models
+        python . reset --docker     # Purge Docker containers, volumes, images
+        python . reset --temp       # Clear temp files and caches
+        python . reset -i -d        # Combinations supported
+    """
+    from src.reset import reset_environment
+
+    parser = argparse.ArgumentParser(
+        prog="python . reset",
+        description="Reset development environment artifacts",
+    )
+    parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        dest="all_",
+        help="Full environment reset (index + models + docker + temp)",
+    )
+    parser.add_argument(
+        "-i",
+        "--index",
+        action="store_true",
+        help="Clear RAG vector indices",
+    )
+    parser.add_argument(
+        "-m",
+        "--models",
+        action="store_true",
+        help="Clear downloaded embedding models",
+    )
+    parser.add_argument(
+        "-d",
+        "--docker",
+        action="store_true",
+        help="Purge Docker containers, volumes, and images",
+    )
+    parser.add_argument(
+        "-t",
+        "--temp",
+        action="store_true",
+        help="Clear temporary files and caches",
+    )
+
+    args = parser.parse_args(argv)
+
+    # Expand --all to all flags
+    if args.all_:
+        args.index = True
+        args.models = True
+        args.docker = True
+        args.temp = True
+
+    success = reset_environment(
+        index=args.index,
+        models=args.models,
+        docker=args.docker,
+        temp=args.temp,
+        verbose=True,
+    )
+
+    return 0 if success else 1
+
+
+# =============================================================================
+# Environment Command
+# =============================================================================
+
+
 def _add_docker_flags(parser: argparse.ArgumentParser) -> None:
     """Add standard --docker and --image flags to a parser."""
     parser.add_argument(
@@ -2557,6 +2637,7 @@ def show_help() -> None:
     print("  index      Build and manage RAG vector indices")
     print("\n=== Environment ===")
     print("  env        Check environment capabilities (GPU, Docker)")
+    print("  reset      Reset development environment artifacts")
     print("\n=== Development ===")
     print("  dev        Development workflows (test, benchmark, etc.)")
     print("\nGetting Started:")
@@ -2579,6 +2660,10 @@ def show_help() -> None:
     print("  python . index build --all          # Build RAG index from all providers")
     print("  python . index build rico_semantic  # Build index from specific provider")
     print("  python . index info .corpus/index   # Show index information")
+    print("\nEnvironment Reset:")
+    print("  python . reset                       # Clear RAG indices (default)")
+    print("  python . reset --all                 # Full environment reset")
+    print("  python . reset -i -d                 # Clear indices and Docker")
     print("\nDevelopment Examples:")
     print("  python . dev test --unit             # Run unit tests")
     print("  python . dev stats                   # Profile corpus data")
@@ -2610,6 +2695,7 @@ def main() -> int:
         "docker": lambda: handle_docker_command(rest_args),
         "index": lambda: handle_index_command(rest_args),
         "env": lambda: handle_env_command(rest_args),
+        "reset": lambda: handle_reset_command(rest_args),
     }
 
     # Development commands (nested under 'dev')

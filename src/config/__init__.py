@@ -44,6 +44,8 @@ from .lib import (
     get_models_dir,
     # Introspection
     list_environment_variables,
+    # Utilities
+    _find_repo_root as find_repo_root,
 )
 
 __all__ = [
@@ -65,4 +67,6 @@ __all__ = [
     "get_docker_ports",
     # Introspection
     "list_environment_variables",
+    # Utilities
+    "find_repo_root",
 ]
