@@ -167,16 +167,39 @@ def reset(all_, index, models, docker, temp):
 3. Add CLI command with flags
 4. Test each cleanup path
 
-### Phase 2: Investigate index.models Bug
-The vector store may be creating `index.models/` inside the index directory. Models should live in `.corpus/models/` as shared cross-index assets.
+### Phase 2: Investigate index.models Bug - COMPLETED
 
-1. Audit `src/vector/lib.py` model storage logic
-2. Fix to use `.corpus/models/` consistently
-3. Separate PR if changes are invasive
+**Finding: No bug exists.** The architecture correctly separates:
+- Models: `.corpus/models/` via `ModelManager` class
+- Indices: `.corpus/index/` via `VectorStore` class
 
-### Phase 3: CLI Shorthand Audit
-Ensure all CLI commands have consistent shorthand flags.
+Key verified locations:
+- `src/vector/models/lib.py`: `ModelManager` uses `get_models_dir()` (line 47)
+- `src/vector/backend/local.py`: `LocalBackend` delegates to centralized `ModelManager`
+- `src/config/lib.py`: Separate `get_models_dir()` and `get_index_dir()` functions
 
-1. Audit existing commands
-2. Document naming convention
-3. Add missing shorthands
+No code creates `index.models/` directories.
+
+### Phase 3: CLI Shorthand Audit - COMPLETED
+
+**Audit Summary:** The `reset` command establishes a consistent pattern. Other commands have gaps.
+
+#### Commands with Good Shorthand Coverage
+- `generate layout`: `-m`, `-k`, `-i`, `-o`, `-t`, `-f` (missing: `--temperature`, `--retries`)
+- `dev benchmark`: `-i`, `-m`, `-q`, `-v` (missing: `--min-pass-rate`)
+- `dev demo`: `-p`, `-r`, `-f`, `-o`
+- `corpus download`: `-o`, `-f`
+
+#### Commands Missing Shorthands
+| Command | Missing Shorthand For |
+|---------|----------------------|
+| `search` | `--docker`, `--force` |
+| `index build` | `--batch-size`, `--limit`, `--skip-download`, `--docker` |
+| `service init` | All flags (9 flags without shorthands) |
+| `env check/gpu` | `--docker` |
+
+#### Recommended Convention
+- **Lowercase** for common flags: `-d` (docker), `-f` (force/format), `-o` (output), `-i` (index), `-m` (model)
+- **Uppercase** for disambiguation: `-T` (temperature vs target), `-B` (batch-size vs backend)
+
+**Recommendation:** Create follow-up PR to add missing shorthands using this convention.
