@@ -117,6 +117,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY src/ ./src/
+COPY docker/ ./docker/
 COPY __main__.py pyproject.toml ./
 
 # Create directories for runtime data
