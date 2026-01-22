@@ -54,6 +54,30 @@ def test_env_check_shows_docker():
     assert "Docker:" in result.stdout
 
 
+def test_env_check_accepts_docker_flag():
+    """env check should accept --docker flag."""
+    result = subprocess.run(
+        [sys.executable, ".", "env", "check", "--help"],
+        capture_output=True,
+        text=True,
+        cwd="Y:\\code\\wireframe-mcp-worktrees\\feature-cli-env-audit",
+        timeout=30,
+    )
+    assert "--docker" in result.stdout
+
+
+def test_env_check_accepts_image_flag():
+    """env check should accept --image flag."""
+    result = subprocess.run(
+        [sys.executable, ".", "env", "check", "--help"],
+        capture_output=True,
+        text=True,
+        cwd="Y:\\code\\wireframe-mcp-worktrees\\feature-cli-env-audit",
+        timeout=30,
+    )
+    assert "--image" in result.stdout
+
+
 def test_env_gpu_subcommand():
     """env gpu subcommand should work."""
     result = subprocess.run(
@@ -65,6 +89,18 @@ def test_env_gpu_subcommand():
     )
     assert result.returncode in (0, 1)
     assert "GPU:" in result.stdout or "FAISS" in result.stdout
+
+
+def test_env_gpu_accepts_docker_flag():
+    """env gpu should accept --docker flag."""
+    result = subprocess.run(
+        [sys.executable, ".", "env", "gpu", "--help"],
+        capture_output=True,
+        text=True,
+        cwd="Y:\\code\\wireframe-mcp-worktrees\\feature-cli-env-audit",
+        timeout=30,
+    )
+    assert "--docker" in result.stdout
 
 
 def test_env_docker_subcommand():

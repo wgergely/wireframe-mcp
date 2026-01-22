@@ -2418,8 +2418,21 @@ def handle_mcp_command(argv: list[str]) -> int:
 # =============================================================================
 
 
-def cmd_env_check(_args: argparse.Namespace) -> int:
+def cmd_env_check(args: argparse.Namespace) -> int:
     """Check environment capabilities for GPU-dependent commands."""
+    # Check for Docker execution mode
+    if getattr(args, "docker", False):
+        from src.docker.exec import run_in_container
+
+        inner_cmd = ["python", ".", "env", "check"]
+        logger.info(f"Checking environment inside Docker container: {args.image}")
+        result = run_in_container(
+            command=inner_cmd,
+            image=args.image,
+            gpu=True,
+        )
+        return result.returncode
+
     from src.environment import check_environment
 
     report = check_environment()
@@ -2429,8 +2442,21 @@ def cmd_env_check(_args: argparse.Namespace) -> int:
     return 0 if report.can_run_gpu_commands else 1
 
 
-def _cmd_env_gpu() -> int:
+def _cmd_env_gpu(args: argparse.Namespace) -> int:
     """Quick GPU check."""
+    # Check for Docker execution mode
+    if getattr(args, "docker", False):
+        from src.docker.exec import run_in_container
+
+        inner_cmd = ["python", ".", "env", "gpu"]
+        logger.info(f"Checking GPU inside Docker container: {args.image}")
+        result = run_in_container(
+            command=inner_cmd,
+            image=args.image,
+            gpu=True,
+        )
+        return result.returncode
+
     from src.environment import detect_gpu_capabilities
 
     caps = detect_gpu_capabilities()
@@ -2440,7 +2466,7 @@ def _cmd_env_gpu() -> int:
     return 0 if caps.has_gpu else 1
 
 
-def _cmd_env_docker() -> int:
+def _cmd_env_docker(args: argparse.Namespace) -> int:
     """Quick Docker check."""
     from src.environment import detect_docker
 
@@ -2451,13 +2477,29 @@ def _cmd_env_docker() -> int:
     return 0 if docker.can_run_gpu else 1
 
 
+def _add_docker_flags(parser: argparse.ArgumentParser) -> None:
+    """Add standard --docker and --image flags to a parser."""
+    parser.add_argument(
+        "--docker",
+        action="store_true",
+        help="Run check inside Docker container",
+    )
+    parser.add_argument(
+        "--image",
+        type=str,
+        default="wireframe-mcp:latest",
+        help="Docker image to use (default: wireframe-mcp:latest)",
+    )
+
+
 def handle_env_command(argv: list[str]) -> int:
     """Handle environment inspection commands.
 
     Usage:
-        python . env check    # Full environment report
-        python . env gpu      # GPU-only check
-        python . env docker   # Docker-only check
+        python . env check              # Full environment report (local)
+        python . env check --docker     # Full environment report (in container)
+        python . env gpu                # GPU-only check
+        python . env docker             # Docker availability check
     """
     parser = argparse.ArgumentParser(
         prog="python . env",
@@ -2470,6 +2512,7 @@ def handle_env_command(argv: list[str]) -> int:
         "check",
         help="Full environment capability check",
     )
+    _add_docker_flags(check_parser)
     check_parser.set_defaults(func=cmd_env_check)
 
     # gpu command (quick check)
@@ -2477,14 +2520,15 @@ def handle_env_command(argv: list[str]) -> int:
         "gpu",
         help="GPU capability check only",
     )
-    gpu_parser.set_defaults(func=lambda args: _cmd_env_gpu())
+    _add_docker_flags(gpu_parser)
+    gpu_parser.set_defaults(func=_cmd_env_gpu)
 
-    # docker command (quick check)
+    # docker command (quick check) - no --docker flag here, it's checking Docker itself
     docker_parser = subparsers.add_parser(
         "docker",
         help="Docker availability check only",
     )
-    docker_parser.set_defaults(func=lambda args: _cmd_env_docker())
+    docker_parser.set_defaults(func=_cmd_env_docker)
 
     if not argv:
         # Default to full check
