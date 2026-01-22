@@ -648,6 +648,40 @@ def handle_index_command(argv: list[str]) -> int:
 def cmd_search_index(args: argparse.Namespace) -> int:
     """Handle the search command."""
     from src.config import get_index_dir
+
+    # Check for Docker execution mode
+    if getattr(args, "docker", False):
+        from src.docker.exec import run_in_container
+
+        index_path = args.index if args.index else get_index_dir()
+
+        inner_cmd = ["python", ".", "search", args.query, "-k", str(args.k)]
+        if args.index:
+            inner_cmd.extend(["--index", "/app/corpus/index"])
+
+        logger.info(f"Executing search in Docker container: {args.image}")
+        result = run_in_container(
+            command=inner_cmd,
+            image=args.image,
+            gpu=True,
+            volumes={
+                str(index_path.parent.resolve()): "/app/corpus",
+            },
+        )
+        return result.returncode
+
+    # Validate environment for local execution
+    from src.environment import require_gpu_or_warn
+
+    report = require_gpu_or_warn("search")
+    if not report.can_run_gpu_commands and not getattr(args, "force", False):
+        logger.error(
+            "GPU not available for local execution. "
+            "Use --docker to run in container, or --force to proceed anyway."
+        )
+        return 1
+
+    # Original implementation
     from src.vector import VectorStore
 
     try:
@@ -705,6 +739,23 @@ def handle_search_command(argv: list[str]) -> int:
         type=int,
         default=5,
         help="Number of results to return (default: 5)",
+    )
+    # Docker execution flags
+    parser.add_argument(
+        "--docker",
+        action="store_true",
+        help="Execute inside Docker container with GPU support",
+    )
+    parser.add_argument(
+        "--image",
+        type=str,
+        default="wireframe-mcp:latest",
+        help="Docker image to use (default: wireframe-mcp:latest)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force local execution even without GPU",
     )
 
     if not argv:
