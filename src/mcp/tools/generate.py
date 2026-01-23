@@ -169,6 +169,28 @@ def generate_layout(
                 )
                 result["artifact_id"] = artifact.id
                 logger.debug(f"Persisted artifact: {artifact.id}")
+
+                # Log interaction
+                manager.store_interaction(
+                    tool_name="generate_layout",
+                    request_params={
+                        "query": query,
+                        "model": model,
+                        "temperature": temperature,
+                        "provider": provider,
+                        "include_rag": include_rag,
+                        "session_id": session_id,
+                        "parent_id": parent_id,
+                        "tags": tags,
+                    },
+                    session_id=session_id or artifact.session_id,
+                    artifact_id=artifact.id,
+                    response_summary={
+                        "status": "success",
+                        "node_count": len(str(layout_dict)),
+                        "rag_used": rag_available,
+                    },
+                )
             except Exception as e:
                 logger.warning(f"Failed to persist artifact: {e}")
                 result["artifact_id"] = None
