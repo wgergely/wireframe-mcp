@@ -679,3 +679,103 @@ class TestInteractionModel:
         )
         assert interaction.tool_name == "refine_layout"
         assert interaction.feedback == "make the sidebar narrower"
+
+
+# =============================================================================
+# Interaction Storage Tests
+# =============================================================================
+
+
+class TestInteractionStorage:
+    """Tests for interaction storage operations."""
+
+    def test_store_interaction(self, manager):
+        """Test storing an interaction."""
+        session = manager.get_or_create_session("test-session")
+
+        interaction = manager.store_interaction(
+            tool_name="generate_layout",
+            request_params={"query": "login form"},
+            session_id=session.id,
+        )
+
+        assert interaction.id is not None
+        assert interaction.tool_name == "generate_layout"
+
+    def test_get_interaction(self, manager):
+        """Test retrieving an interaction."""
+        session = manager.get_or_create_session("test-session")
+
+        stored = manager.store_interaction(
+            tool_name="status",
+            request_params={},
+            session_id=session.id,
+        )
+
+        retrieved = manager.get_interaction(stored.id)
+        assert retrieved is not None
+        assert retrieved.id == stored.id
+
+    def test_list_interactions_by_session(self, manager):
+        """Test listing interactions for a session."""
+        session = manager.get_or_create_session("test-session")
+
+        for i in range(5):
+            manager.store_interaction(
+                tool_name=f"tool_{i}",
+                request_params={"index": i},
+                session_id=session.id,
+            )
+
+        interactions = manager.list_interactions(session_id=session.id)
+        assert len(interactions) == 5
+
+    def test_list_interactions_by_artifact(self, manager, sample_layout, sample_stats):
+        """Test listing interactions linked to an artifact."""
+        session = manager.get_or_create_session("test-session")
+        artifact = manager.store_artifact(
+            query="test",
+            layout=sample_layout,
+            draft="Test",
+            session_id=session.id,
+            model="gpt-4.1-mini",
+            temperature=0.7,
+            stats=sample_stats,
+        )
+
+        manager.store_interaction(
+            tool_name="generate_layout",
+            request_params={"query": "test"},
+            session_id=session.id,
+            artifact_id=artifact.id,
+        )
+
+        interactions = manager.list_interactions(artifact_id=artifact.id)
+        assert len(interactions) == 1
+        assert interactions[0].artifact_id == artifact.id
+
+    def test_get_session_timeline(self, manager, sample_layout, sample_stats):
+        """Test getting session timeline."""
+        session = manager.get_or_create_session("test-session")
+
+        # Store an artifact
+        artifact = manager.store_artifact(
+            query="login form",
+            layout=sample_layout,
+            draft="Login [container]",
+            session_id=session.id,
+            model="gpt-4.1-mini",
+            temperature=0.7,
+            stats=sample_stats,
+        )
+
+        # Store an interaction
+        manager.store_interaction(
+            tool_name="generate_layout",
+            request_params={"query": "login form"},
+            session_id=session.id,
+            artifact_id=artifact.id,
+        )
+
+        timeline = manager.get_session_timeline(session_id=session.id)
+        assert len(timeline) == 2  # 1 artifact + 1 interaction

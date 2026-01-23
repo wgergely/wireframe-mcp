@@ -12,6 +12,7 @@ from .models import (
     CleanupResult,
     GenerationArtifact,
     GenerationStats,
+    Interaction,
     Session,
     StorageConfig,
     StorageStats,
@@ -472,6 +473,147 @@ class HistoryManager:
             if artifact:
                 artifacts.append(artifact)
         return artifacts
+
+    # =========================================================================
+    # Interaction Logging
+    # =========================================================================
+
+    def store_interaction(
+        self,
+        tool_name: str,
+        request_params: dict[str, Any],
+        session_id: str | None = None,
+        artifact_id: str | None = None,
+        response_summary: dict[str, Any] | None = None,
+        feedback: str | None = None,
+        agent_id: str | None = None,
+    ) -> Interaction:
+        """Log an MCP tool interaction.
+
+        Args:
+            tool_name: Name of the MCP tool called.
+            request_params: Input parameters.
+            session_id: Session to attach to (uses current if None).
+            artifact_id: Linked artifact for generation tools.
+            response_summary: Summary of response.
+            feedback: For refine_layout, the feedback string.
+            agent_id: Optional client/agent identifier.
+
+        Returns:
+            Stored interaction.
+        """
+        if session_id is None:
+            session = self.get_or_create_session()
+            session_id = session.id
+
+        interaction = Interaction.create(
+            session_id=session_id,
+            tool_name=tool_name,
+            request_params=request_params,
+            artifact_id=artifact_id,
+            response_summary=response_summary,
+            feedback=feedback,
+            agent_id=agent_id,
+        )
+
+        stored = self._storage.store_interaction(interaction)
+        logger.debug(f"Logged interaction {stored.id}: {tool_name}")
+        return stored
+
+    def get_interaction(self, interaction_id: str) -> Interaction | None:
+        """Get an interaction by ID.
+
+        Args:
+            interaction_id: Interaction identifier.
+
+        Returns:
+            Interaction if found, None otherwise.
+        """
+        return self._storage.get_interaction(interaction_id)
+
+    def list_interactions(
+        self,
+        session_id: str | None = None,
+        artifact_id: str | None = None,
+        tool_name: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Interaction]:
+        """List interactions with filtering options.
+
+        Args:
+            session_id: Filter by session.
+            artifact_id: Filter by linked artifact.
+            tool_name: Filter by tool name.
+            limit: Maximum interactions to return.
+            offset: Number to skip.
+
+        Returns:
+            List of interactions ordered by created_at descending.
+        """
+        return self._storage.list_interactions(
+            session_id=session_id,
+            artifact_id=artifact_id,
+            tool_name=tool_name,
+            limit=limit,
+            offset=offset,
+        )
+
+    def get_session_timeline(
+        self,
+        session_id: str,
+        include_artifacts: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Get chronological timeline of session activity.
+
+        Combines interactions and artifacts into a unified timeline
+        for conversation reconstruction.
+
+        Args:
+            session_id: Session to get timeline for.
+            include_artifacts: Include artifact details.
+
+        Returns:
+            List of timeline events ordered by timestamp.
+        """
+        timeline: list[dict[str, Any]] = []
+
+        # Get all interactions
+        interactions = self.list_interactions(session_id=session_id, limit=1000)
+        for interaction in interactions:
+            event: dict[str, Any] = {
+                "type": "interaction",
+                "timestamp": interaction.created_at.isoformat(),
+                "tool_name": interaction.tool_name,
+                "request_params": interaction.request_params,
+                "artifact_id": interaction.artifact_id,
+                "feedback": interaction.feedback,
+            }
+            if interaction.response_summary:
+                event["response_summary"] = interaction.response_summary
+            timeline.append(event)
+
+        # Optionally include artifacts
+        if include_artifacts:
+            artifacts = self.list_artifacts(session_id=session_id, limit=1000)
+            for artifact in artifacts:
+                event = {
+                    "type": "artifact",
+                    "timestamp": artifact.created_at.isoformat(),
+                    "artifact_id": artifact.id,
+                    "query": artifact.query,
+                    "draft_preview": artifact.draft[:200]
+                    if len(artifact.draft) > 200
+                    else artifact.draft,
+                    "parent_id": artifact.parent_id,
+                    "model": artifact.model,
+                }
+                timeline.append(event)
+
+        # Sort by timestamp
+        timeline.sort(key=lambda x: x["timestamp"])
+
+        return timeline
 
     # =========================================================================
     # Preview Cache
