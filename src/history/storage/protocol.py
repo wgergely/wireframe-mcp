@@ -8,6 +8,7 @@ from typing import Protocol
 from ..models import (
     CleanupResult,
     GenerationArtifact,
+    Interaction,
     Session,
     StorageConfig,
     StorageStats,
@@ -229,6 +230,54 @@ class HistoryStorage(Protocol):
 
         Returns:
             List of variation sets ordered by created_at descending.
+        """
+        ...
+
+    # =========================================================================
+    # Interaction Operations
+    # =========================================================================
+
+    def store_interaction(self, interaction: Interaction) -> Interaction:
+        """Store a new interaction.
+
+        Args:
+            interaction: Interaction to store.
+
+        Returns:
+            Stored interaction.
+        """
+        ...
+
+    def get_interaction(self, interaction_id: str) -> Interaction | None:
+        """Get an interaction by ID.
+
+        Args:
+            interaction_id: Interaction identifier.
+
+        Returns:
+            Interaction if found, None otherwise.
+        """
+        ...
+
+    def list_interactions(
+        self,
+        session_id: str | None = None,
+        artifact_id: str | None = None,
+        tool_name: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Interaction]:
+        """List interactions with filtering options.
+
+        Args:
+            session_id: Filter by session.
+            artifact_id: Filter by linked artifact.
+            tool_name: Filter by tool name.
+            limit: Maximum interactions to return.
+            offset: Number to skip.
+
+        Returns:
+            List of interactions ordered by created_at descending.
         """
         ...
 
