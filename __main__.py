@@ -1879,7 +1879,7 @@ def cmd_service_init(args: list[str]) -> int:
                     from src.docker.exec import run_in_container
 
                     # Build the command
-                    # Note: Image has ENTRYPOINT ["python"], so we start with "." not "python ."
+                    # Note: Image has ENTRYPOINT ["python"], so use "." not "python ."
                     inner_cmd = [".", "index", "build", "--all"]
                     if opts["index_limit"] is not None:
                         inner_cmd.extend(["--limit", str(opts["index_limit"])])
