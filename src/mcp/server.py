@@ -405,6 +405,61 @@ def refine_layout(
 
 
 # =============================================================================
+# Session History Tools
+# =============================================================================
+
+
+@mcp.tool
+def get_session_history(
+    session_id: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Get session history for conversation reconstruction.
+
+    Returns a chronological timeline of all tool calls and generated
+    artifacts. Use this to understand what has happened in a design
+    conversation or to resume work after context loss.
+
+    Args:
+        session_id: Session to get history for (uses current if None).
+        limit: Maximum events to return (1-200). Default: 50
+
+    Returns:
+        Dictionary with session_id, timeline, artifact_count, interaction_count
+    """
+    limit = max(1, min(200, limit))
+
+    from .tools.session_history import get_session_history as _get_session_history
+
+    return _get_session_history(
+        session_id=session_id,
+        limit=limit,
+        include_artifacts=True,
+    )
+
+
+@mcp.tool
+def get_artifact_history(
+    artifact_id: str,
+) -> dict[str, Any]:
+    """Get the full refinement history of an artifact.
+
+    Traces all refinements that led to this artifact and returns
+    the feedback given at each step. Essential for understanding
+    how a design evolved.
+
+    Args:
+        artifact_id: Artifact to get history for.
+
+    Returns:
+        Dictionary with lineage, feedback_chain, and interactions
+    """
+    from .tools.session_history import get_artifact_history as _get_artifact_history
+
+    return _get_artifact_history(artifact_id=artifact_id)
+
+
+# =============================================================================
 # Status Tools
 # =============================================================================
 

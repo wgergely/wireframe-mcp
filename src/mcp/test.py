@@ -195,15 +195,18 @@ class TestToolRegistration:
         """Only essential tools are exposed (no dev/admin tools)."""
         tool_names = set(mcp._tool_manager._tools.keys())
 
-        # Should have exactly 10 tools:
+        # Should have exactly 12 tools:
         # - Core: generate_layout, preview_layout, generate_variations,
         #         get_artifact, validate_layout, search_layouts, refine_layout
+        # - Session History: get_session_history, get_artifact_history
         # - Status: status, help, list_models
-        assert len(tool_names) == 10
+        assert len(tool_names) == 12
 
         # Verify expected tools
         assert "help" in tool_names
         assert "list_models" in tool_names
+        assert "get_session_history" in tool_names
+        assert "get_artifact_history" in tool_names
 
         # These should NOT be exposed (dev/admin concerns)
         assert "get_server_info" not in tool_names
