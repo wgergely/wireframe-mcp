@@ -2623,6 +2623,224 @@ def handle_env_command(argv: list[str]) -> int:
     return args.func(args)
 
 
+# =============================================================================
+# History Command
+# =============================================================================
+
+
+def handle_history_command(argv: list[str]) -> int:
+    """Handle history management commands.
+
+    Usage:
+        python . history list              # List recent artifacts
+        python . history list -s           # List sessions
+        python . history clear --all       # Clear all history
+        python . history stats             # Show storage statistics
+        python . history timeline          # Show session timeline
+    """
+    from src.history import get_history_manager
+
+    parser = argparse.ArgumentParser(
+        prog="python . history",
+        description="Manage generation history",
+    )
+    subparsers = parser.add_subparsers(dest="subcommand", required=True)
+
+    # --- list subcommand ---
+    list_parser = subparsers.add_parser(
+        "list", help="List history artifacts or sessions"
+    )
+    list_parser.add_argument(
+        "-s",
+        "--sessions",
+        action="store_true",
+        help="List sessions instead of artifacts",
+    )
+    list_parser.add_argument(
+        "-l",
+        "--limit",
+        type=int,
+        default=20,
+        help="Number of items to show (default: 20)",
+    )
+    list_parser.add_argument(
+        "--session-id",
+        type=str,
+        help="Filter artifacts by session ID",
+    )
+
+    # --- clear subcommand ---
+    clear_parser = subparsers.add_parser("clear", help="Clear history data")
+    clear_parser.add_argument(
+        "--session-id",
+        type=str,
+        help="Clear specific session only",
+    )
+    clear_parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        dest="clear_all",
+        help="Clear ALL history (destructive)",
+    )
+    clear_parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Skip confirmation prompt",
+    )
+
+    # --- stats subcommand ---
+    subparsers.add_parser("stats", help="Show history storage statistics")
+
+    # --- timeline subcommand ---
+    timeline_parser = subparsers.add_parser("timeline", help="Show session timeline")
+    timeline_parser.add_argument(
+        "--session-id",
+        type=str,
+        help="Session to show timeline for",
+    )
+    timeline_parser.add_argument(
+        "-l",
+        "--limit",
+        type=int,
+        default=20,
+        help="Number of events to show (default: 20)",
+    )
+
+    args = parser.parse_args(argv)
+    manager = get_history_manager()
+
+    # --- Handle list ---
+    if args.subcommand == "list":
+        if args.sessions:
+            items = manager.list_sessions(limit=args.limit)
+            print(f"\n{'ID':<40} {'Name':<20} {'Artifacts':<10} {'Updated'}")
+            print("-" * 85)
+            for session in items:
+                name = session.name or "(unnamed)"
+                name = name[:20] if len(name) > 20 else name
+                updated = session.updated_at.strftime("%Y-%m-%d %H:%M")
+                count = session.artifact_count
+                print(f"{session.id:<40} {name:<20} {count:<10} {updated}")
+        else:
+            items = manager.list_artifacts(session_id=args.session_id, limit=args.limit)
+            print(f"\n{'ID':<40} {'Query':<30} {'Created'}")
+            print("-" * 85)
+            for artifact in items:
+                query = (
+                    artifact.query[:27] + "..."
+                    if len(artifact.query) > 30
+                    else artifact.query
+                )
+                created = artifact.created_at.strftime("%Y-%m-%d %H:%M")
+                print(f"{artifact.id:<40} {query:<30} {created}")
+        print(f"\nTotal: {len(items)} items")
+        return 0
+
+    # --- Handle clear ---
+    if args.subcommand == "clear":
+        if not args.session_id and not args.clear_all:
+            print("Error: Specify --session-id or --all")
+            return 1
+
+        if args.clear_all:
+            stats = manager.get_stats()
+            if not args.force:
+                print("\nThis will delete:")
+                print(f"  - {stats.artifact_count} artifacts")
+                print(f"  - {stats.session_count} sessions")
+                print(f"  - {stats.total_size_bytes / 1024 / 1024:.2f} MB of data")
+                confirm = input("\nType 'yes' to confirm: ")
+                if confirm.lower() != "yes":
+                    print("Cancelled.")
+                    return 0
+
+            sessions = manager.list_sessions(limit=10000)
+            for session in sessions:
+                manager.delete_session(session.id)
+            n_art, n_sess = stats.artifact_count, stats.session_count
+            print(f"Cleared {n_art} artifacts, {n_sess} sessions")
+
+        elif args.session_id:
+            session = manager.get_session(args.session_id)
+            if not session:
+                print(f"Session not found: {args.session_id}")
+                return 1
+
+            if not args.force:
+                print(f"\nSession: {session.name or args.session_id}")
+                print(f"Artifacts: {session.artifact_count}")
+                confirm = input("Delete? (yes/no): ")
+                if confirm.lower() != "yes":
+                    print("Cancelled.")
+                    return 0
+
+            manager.delete_session(args.session_id)
+            print(f"Deleted session {args.session_id}")
+        return 0
+
+    # --- Handle stats ---
+    if args.subcommand == "stats":
+        stats = manager.get_stats()
+        print("\n=== History Storage Statistics ===")
+        print(f"Total size:       {stats.total_size_bytes / 1024 / 1024:.2f} MB")
+        print(f"Artifacts:        {stats.artifact_count}")
+        print(f"Sessions:         {stats.session_count}")
+        print(f"Variation sets:   {stats.variation_set_count}")
+        print(
+            f"Preview cache:    {stats.preview_cache_size_bytes / 1024 / 1024:.2f} MB"
+        )
+        print(f"Oldest artifact:  {stats.oldest_artifact_age_days:.0f} days")
+        print(f"Orphan count:     {stats.orphan_count}")
+
+        interactions = manager.list_interactions(limit=10000)
+        print(f"Interactions:     {len(interactions)}")
+        return 0
+
+    # --- Handle timeline ---
+    if args.subcommand == "timeline":
+        session_id = args.session_id
+        if session_id is None:
+            session = manager.get_or_create_session()
+            session_id = session.id
+
+        timeline = manager.get_session_timeline(session_id=session_id)
+
+        if not timeline:
+            print("No events in timeline.")
+            return 0
+
+        timeline = timeline[-args.limit :]
+
+        print(f"\n=== Session Timeline ({session_id[:8]}...) ===\n")
+
+        for event in timeline:
+            timestamp = event["timestamp"][:19]
+
+            if event["type"] == "interaction":
+                tool = event["tool_name"]
+                feedback = event.get("feedback")
+                if feedback:
+                    feedback_preview = (
+                        feedback[:50] + "..." if len(feedback) > 50 else feedback
+                    )
+                    print(f"{timestamp}  [CALL] {tool}")
+                    print(f"                     Feedback: {feedback_preview}")
+                else:
+                    print(f"{timestamp}  [CALL] {tool}")
+
+            elif event["type"] == "artifact":
+                query = event.get("query", "")[:40]
+                artifact_id = event["artifact_id"][:8]
+                print(f"{timestamp}  [GEN]  {artifact_id}... → {query}")
+
+        print(f"\nTotal events: {len(timeline)}")
+        return 0
+
+    return 0
+
+
 def show_help() -> None:
     """Display CLI help message."""
     print("Usage: python . {command} [args]")
@@ -2664,6 +2882,12 @@ def show_help() -> None:
     print("  python . reset                       # Clear RAG indices (default)")
     print("  python . reset --all                 # Full environment reset")
     print("  python . reset -i -d                 # Clear indices and Docker")
+    print("\nHistory Management:")
+    print("  python . history list                # List recent artifacts")
+    print("  python . history list -s             # List sessions")
+    print("  python . history stats               # Show storage statistics")
+    print("  python . history timeline            # Show session timeline")
+    print("  python . history clear --all         # Clear all history")
     print("\nDevelopment Examples:")
     print("  python . dev test --unit             # Run unit tests")
     print("  python . dev stats                   # Profile corpus data")
@@ -2696,6 +2920,7 @@ def main() -> int:
         "index": lambda: handle_index_command(rest_args),
         "env": lambda: handle_env_command(rest_args),
         "reset": lambda: handle_reset_command(rest_args),
+        "history": lambda: handle_history_command(rest_args),
     }
 
     # Development commands (nested under 'dev')
