@@ -57,6 +57,7 @@ def history_dir(temp_dir):
 class TestClearHistory:
     """Tests for clear_history() function."""
 
+    @pytest.mark.unit
     def test_clear_history_deletes_database(self, temp_dir, history_dir, monkeypatch):
         """Test that clear_history deletes the history database."""
         from src.reset.lib import clear_history
@@ -78,6 +79,7 @@ class TestClearHistory:
         assert not (history_dir / "history.db-wal").exists()
         assert not (history_dir / "history.db-shm").exists()
 
+    @pytest.mark.unit
     def test_clear_history_deletes_preview_cache(
         self, temp_dir, history_dir, monkeypatch
     ):
@@ -95,6 +97,7 @@ class TestClearHistory:
         # Preview cache should be deleted
         assert not (history_dir / "previews").exists()
 
+    @pytest.mark.unit
     def test_clear_history_returns_true_when_nothing_to_clear(
         self, temp_dir, monkeypatch
     ):
@@ -111,6 +114,7 @@ class TestClearHistory:
 
         assert result is True
 
+    @pytest.mark.unit
     def test_clear_history_prints_status_when_verbose(
         self, temp_dir, history_dir, monkeypatch, capsys
     ):
@@ -136,6 +140,7 @@ class TestClearHistory:
 class TestResetEnvironmentWithHistory:
     """Tests for reset_environment() with history flag."""
 
+    @pytest.mark.unit
     def test_reset_environment_calls_clear_history(
         self, temp_dir, history_dir, monkeypatch
     ):
@@ -159,6 +164,7 @@ class TestResetEnvironmentWithHistory:
 
         assert clear_history_called is True
 
+    @pytest.mark.unit
     def test_reset_environment_history_not_called_by_default(self, monkeypatch):
         """Test that clear_history is NOT called when history flag is False."""
         from src.reset.lib import reset_environment
@@ -178,6 +184,7 @@ class TestResetEnvironmentWithHistory:
 
         assert clear_history_called is False
 
+    @pytest.mark.unit
     def test_reset_environment_all_includes_history(self, monkeypatch):
         """Test that --all should NOT automatically include history (per plan)."""
         # Note: Per the plan, --all expands to index + models + docker + temp
@@ -214,6 +221,7 @@ class TestResetEnvironmentWithHistory:
 class TestResetCommandHistoryFlag:
     """Tests for the --history CLI flag."""
 
+    @pytest.mark.unit
     def test_reset_command_accepts_history_flag(self, monkeypatch):
         """Test that the reset command accepts --history flag."""
         import importlib.util
@@ -241,6 +249,7 @@ class TestResetCommandHistoryFlag:
         assert result == 0
         assert called_with.get("history") is True
 
+    @pytest.mark.unit
     def test_reset_command_short_flag_H(self, monkeypatch):
         """Test that the reset command accepts -H short flag."""
         import importlib.util
@@ -266,6 +275,7 @@ class TestResetCommandHistoryFlag:
         assert result == 0
         assert called_with.get("history") is True
 
+    @pytest.mark.unit
     def test_reset_command_history_with_other_flags(self, monkeypatch):
         """Test --history can be combined with other flags."""
         import importlib.util

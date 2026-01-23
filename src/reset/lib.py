@@ -8,6 +8,7 @@ Functions:
     clear_models: Remove downloaded embedding models
     clear_docker: Purge Docker containers, volumes, and images
     clear_temp: Remove temporary files and caches
+    clear_history: Remove history database and preview cache
     reset_environment: Orchestrate full or partial reset
 """
 
