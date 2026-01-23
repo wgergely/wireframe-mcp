@@ -16,6 +16,7 @@ from ..models import (
     CleanupResult,
     GenerationArtifact,
     GenerationStats,
+    Interaction,
     Session,
     StorageConfig,
     StorageStats,
@@ -78,6 +79,21 @@ CREATE TABLE IF NOT EXISTS variation_sets (
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 
+-- Interactions table
+CREATE TABLE IF NOT EXISTS interactions (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    artifact_id TEXT,
+    tool_name TEXT NOT NULL,
+    request_params TEXT NOT NULL,  -- JSON
+    response_summary TEXT,  -- JSON
+    feedback TEXT,
+    agent_id TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL
+);
+
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_parent ON artifacts(parent_id);
@@ -87,6 +103,10 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_created ON artifacts(created_at);
 CREATE INDEX IF NOT EXISTS idx_artifacts_accessed ON artifacts(accessed_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at);
 CREATE INDEX IF NOT EXISTS idx_variation_sets_session ON variation_sets(session_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_session ON interactions(session_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_artifact ON interactions(artifact_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_tool ON interactions(tool_name);
+CREATE INDEX IF NOT EXISTS idx_interactions_created ON interactions(created_at);
 """
 
 
@@ -491,6 +511,93 @@ class SQLiteStorage:
 
         rows = conn.execute(query, params).fetchall()
         return [self._row_to_variation_set(row) for row in rows]
+
+    # =========================================================================
+    # Interaction Operations
+    # =========================================================================
+
+    def store_interaction(self, interaction: Interaction) -> Interaction:
+        """Store a new interaction."""
+        conn = self._get_conn()
+        conn.execute(
+            """
+            INSERT INTO interactions (
+                id, session_id, artifact_id, tool_name, request_params,
+                response_summary, feedback, agent_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                interaction.id,
+                interaction.session_id,
+                interaction.artifact_id,
+                interaction.tool_name,
+                json.dumps(interaction.request_params),
+                json.dumps(interaction.response_summary)
+                if interaction.response_summary
+                else None,
+                interaction.feedback,
+                interaction.agent_id,
+                interaction.created_at.isoformat(),
+            ),
+        )
+        conn.commit()
+        return interaction
+
+    def get_interaction(self, interaction_id: str) -> Interaction | None:
+        """Get an interaction by ID."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM interactions WHERE id = ?", (interaction_id,)
+        ).fetchone()
+        if row:
+            return self._row_to_interaction(row)
+        return None
+
+    def list_interactions(
+        self,
+        session_id: str | None = None,
+        artifact_id: str | None = None,
+        tool_name: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Interaction]:
+        """List interactions with filtering options."""
+        conn = self._get_conn()
+
+        query = "SELECT * FROM interactions WHERE 1=1"
+        params: list[Any] = []
+
+        if session_id:
+            query += " AND session_id = ?"
+            params.append(session_id)
+        if artifact_id:
+            query += " AND artifact_id = ?"
+            params.append(artifact_id)
+        if tool_name:
+            query += " AND tool_name = ?"
+            params.append(tool_name)
+
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = conn.execute(query, params).fetchall()
+        return [self._row_to_interaction(row) for row in rows]
+
+    def _row_to_interaction(self, row: sqlite3.Row) -> Interaction:
+        """Convert database row to Interaction object."""
+        return Interaction(
+            id=row["id"],
+            session_id=row["session_id"],
+            artifact_id=row["artifact_id"],
+            tool_name=row["tool_name"],
+            request_params=json.loads(row["request_params"]),
+            response_summary=json.loads(row["response_summary"])
+            if row["response_summary"]
+            else None,
+            feedback=row["feedback"],
+            agent_id=row["agent_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
 
     # =========================================================================
     # Query Operations
