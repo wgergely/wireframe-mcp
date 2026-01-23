@@ -72,6 +72,23 @@ def refine_layout(
         parent_id=artifact_id,
     )
 
+    # Log refinement interaction with feedback stored separately
+    manager.store_interaction(
+        tool_name="refine_layout",
+        request_params={
+            "artifact_id": artifact_id,
+            "model": model,
+            "temperature": temperature,
+        },
+        session_id=original.session_id,
+        artifact_id=result.get("artifact_id"),
+        feedback=feedback,  # Store feedback separately for later retrieval
+        response_summary={
+            "status": "success",
+            "parent_id": artifact_id,
+        },
+    )
+
     result["parent_id"] = artifact_id
     return result
 
