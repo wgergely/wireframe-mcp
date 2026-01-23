@@ -17,21 +17,22 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from src.config import find_repo_root, get_index_dir, get_models_dir
 from docker.lib import (
     PROJECT_PREFIX,
-    Service,
-    get_service_info,
     VOLUME_CORPUS_DATA,
     VOLUME_CORPUS_MODELS,
     VOLUME_OUTPUT,
+    Service,
+    get_service_info,
 )
+from src.config import find_repo_root, get_index_dir, get_models_dir
 
 __all__ = [
     "clear_indices",
     "clear_models",
     "clear_docker",
     "clear_temp",
+    "clear_history",
     "reset_environment",
 ]
 
@@ -343,11 +344,56 @@ def clear_temp(verbose: bool = True) -> bool:
     return success
 
 
+def clear_history(verbose: bool = True) -> bool:
+    """Delete history database and preview cache.
+
+    Removes:
+        - data/history/history.db (SQLite database)
+        - data/history/history.db-wal (WAL file)
+        - data/history/history.db-shm (shared memory file)
+        - data/history/previews/ (preview cache)
+
+    Args:
+        verbose: Print progress messages.
+
+    Returns:
+        True if all deletions succeeded or nothing to clear.
+    """
+    _print("[reset] Clearing history database...", verbose)
+    success = True
+
+    try:
+        repo_root = find_repo_root()
+        history_dir = repo_root / "data" / "history"
+
+        if history_dir.exists():
+            # Close any open connections first
+            try:
+                from src.history import close_history_manager
+
+                close_history_manager()
+            except Exception as e:
+                _print(f"  Warning: Could not close history manager: {e}", verbose)
+
+            for item in history_dir.iterdir():
+                if not _delete_path(item, verbose):
+                    success = False
+        else:
+            _print("  History directory does not exist", verbose)
+
+    except Exception as e:
+        _print(f"  Failed to clear history: {e}", verbose)
+        success = False
+
+    return success
+
+
 def reset_environment(
     index: bool = False,
     models: bool = False,
     docker: bool = False,
     temp: bool = False,
+    history: bool = False,
     verbose: bool = True,
 ) -> bool:
     """Reset development environment artifacts.
@@ -360,13 +406,14 @@ def reset_environment(
         models: Clear embedding models.
         docker: Purge Docker stack.
         temp: Clear temporary files.
+        history: Clear history database.
         verbose: Print progress messages.
 
     Returns:
         True if all requested operations succeeded.
     """
     # Default to index if nothing specified
-    if not any([index, models, docker, temp]):
+    if not any([index, models, docker, temp, history]):
         index = True
 
     success = True
@@ -385,6 +432,10 @@ def reset_environment(
 
     if temp:
         if not clear_temp(verbose):
+            success = False
+
+    if history:
+        if not clear_history(verbose):
             success = False
 
     if success:

@@ -2492,6 +2492,7 @@ def handle_reset_command(argv: list[str]) -> int:
         python . reset --models     # Clear embedding models
         python . reset --docker     # Purge Docker containers, volumes, images
         python . reset --temp       # Clear temp files and caches
+        python . reset --history    # Clear history database
         python . reset -i -d        # Combinations supported
     """
     from src.reset import reset_environment
@@ -2531,10 +2532,16 @@ def handle_reset_command(argv: list[str]) -> int:
         action="store_true",
         help="Clear temporary files and caches",
     )
+    parser.add_argument(
+        "-H",
+        "--history",
+        action="store_true",
+        help="Clear history database and preview cache",
+    )
 
     args = parser.parse_args(argv)
 
-    # Expand --all to all flags
+    # Expand --all to all flags (except history for safety)
     if args.all_:
         args.index = True
         args.models = True
@@ -2546,6 +2553,7 @@ def handle_reset_command(argv: list[str]) -> int:
         models=args.models,
         docker=args.docker,
         temp=args.temp,
+        history=args.history,
         verbose=True,
     )
 

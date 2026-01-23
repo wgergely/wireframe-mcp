@@ -12,9 +12,10 @@ Example:
 """
 
 from .lib import (
+    clear_docker,
+    clear_history,
     clear_indices,
     clear_models,
-    clear_docker,
     clear_temp,
     reset_environment,
 )
@@ -24,5 +25,6 @@ __all__ = [
     "clear_models",
     "clear_docker",
     "clear_temp",
+    "clear_history",
     "reset_environment",
 ]
